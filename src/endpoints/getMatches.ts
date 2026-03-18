@@ -54,6 +54,7 @@ export const getMatches =
     const $ = HLTVScraper(
       await fetchPage(`https://www.hltv.org/matches?${query}`, config.loadPage)
     )
+
     // all live matches
     const liveMatches = $('.liveMatches > .match-wrapper')
       .toArray()
@@ -62,17 +63,26 @@ export const getMatches =
         const stars = el.numFromAttr('data-stars')!
         const ranked = el.attr('data-eventtype') === 'ranked'
         const region = el.attr('data-region')
-        const lan = el.attr('lan') === 'lan'
+        const lan = el.attr('lan') === 'true'  // 注意這裡原碼寫 lan，但屬性是 lan="true"
         const live = el.attr('live') === 'true'
         const date = undefined
-        const team1 = {
+
+        // team1
+        const team1El = el.find('.match-teams .match-team').first()
+        const team1: Team = {
           id: el.numFromAttr('team1'),
-          name: el.find('.match-teamname').first().text()
+          name: team1El.find('.match-teamname').text().trim(),
+          logo: getLogoUrl(team1El)
         }
-        const team2 = {
+
+        // team2
+        const team2El = el.find('.match-teams .match-team').last()
+        const team2: Team = {
           id: el.numFromAttr('team2'),
-          name: el.find('.match-teamname').second().text()
+          name: team2El.find('.match-teamname').text().trim(),
+          logo: getLogoUrl(team2El)
         }
+
         const event = {
           id: el.numFromAttr('data-event-id'),
           name: el.find('.match-event').first().attr('data-event-headline')
@@ -111,16 +121,24 @@ export const getMatches =
             const stars = matchEl.numFromAttr('data-stars')!
             const ranked = matchEl.attr('data-eventtype') === 'ranked'
             const region = matchEl.attr('data-region')
-            const lan = matchEl.attr('lan') === 'lan'
+            const lan = matchEl.attr('lan') === 'true'
             const live = matchEl.attr('live') === 'true'
             const date = matchEl.find('.match-time').numFromAttr('data-unix')
-            const team1 = {
+
+            // team1
+            const team1El = matchEl.find('.match-teams .match-team').first()
+            const team1: Team = {
               id: matchEl.numFromAttr('team1'),
-              name: matchEl.find('.match-teamname').first().text()
+              name: team1El.find('.match-teamname').text().trim(),
+              logo: getLogoUrl(team1El)
             }
-            const team2 = {
+
+            // team2
+            const team2El = matchEl.find('.match-teams .match-team').last()
+            const team2: Team = {
               id: matchEl.numFromAttr('team2'),
-              name: matchEl.find('.match-teamname').second().text()
+              name: team2El.find('.match-teamname').text().trim(),
+              logo: getLogoUrl(team2El)
             }
 
             const format = matchEl
@@ -143,5 +161,38 @@ export const getMatches =
             }
           })
       })
+
     return [...liveMatches, ...upcomingMatches.flat()]
   }
+
+// Helper function to extract full logo URL
+function getLogoUrl(teamEl: any): string | undefined {
+  let src = teamEl.find('img.match-team-logo').attr('src')
+
+  // 如果有多張圖（day/night），優先取 night-only 或第一張
+  if (!src) {
+    src = teamEl.find('img.night-only').attr('src') || teamEl.find('img.day-only').attr('src')
+  }
+
+  if (!src) {
+    return undefined
+  }
+
+  // 已經是完整 URL 就直接回傳
+  if (src.startsWith('http://') || src.startsWith('https://')) {
+    return src
+  }
+
+  // 相對路徑補完整
+  if (src.startsWith('/')) {
+    return `https://www.hltv.org${src}`
+  }
+
+  // 避免 placeholder
+  if (src.includes('teamplaceholder') || src.includes('dynamic-svg')) {
+    return undefined
+  }
+
+  // 其他情況也補完整域名
+  return `https://www.hltv.org${src.startsWith('/') ? '' : '/'}${src}`
+}
