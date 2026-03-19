@@ -1,8 +1,6 @@
 import { stringify } from 'querystring'
 import { HLTVConfig } from '../config'
 import { HLTVScraper } from '../scraper'
-import { Team } from '../shared/Team'
-import { Event } from '../shared/Event'
 import { fetchPage } from '../utils'
 
 export enum MatchEventType {
@@ -23,17 +21,21 @@ export interface GetMatchesArguments {
   teamIds?: number[]
 }
 
-export interface MatchPreview {
+export interface SimpleMatch {
   id: number
-  team1?: Team
-  team2?: Team
-  date?: number
-  format?: string
-  event?: Event
-  live: boolean
+  status: 'current' | 'upcoming'
+  time?: string          // ISO string, for upcoming it's scheduled time, for current it's optional/current time
+  event: {
+    name: string
+    logo?: string
+  }
   stars: number
-  ranked: boolean
-  region: string
+  maps: string
+  teams: Array<{
+    id?: number
+    name: string
+    logo?: string
+  }>
 }
 
 export const getMatches =
@@ -43,7 +45,7 @@ export const getMatches =
     eventType,
     filter,
     teamIds
-  }: GetMatchesArguments = {}): Promise<MatchPreview[]> => {
+  }: GetMatchesArguments = {}): Promise<SimpleMatch[]> => {
     const query = stringify({
       ...(eventIds ? { event: eventIds } : {}),
       ...(eventType ? { eventType } : {}),
@@ -54,94 +56,112 @@ export const getMatches =
     const $ = HLTVScraper(
       await fetchPage(`https://www.hltv.org/matches?${query}`, config.loadPage)
     )
-    // all live matches
+
+    const getLogoUrl = (el: any): string | undefined => {
+      let src = el.find('img').attr('src') || ''
+
+      if (src.includes('teamplaceholder') || src.includes('dynamic-svg')) {
+        return undefined
+      }
+
+      if (src.startsWith('http')) return src
+      if (src.startsWith('/')) return `https://www.hltv.org${src}`
+
+      return undefined
+    }
+
+    // Live matches (current)
     const liveMatches = $('.liveMatches > .match-wrapper')
       .toArray()
       .map((el) => {
         const id = el.numFromAttr('data-match-id')!
         const stars = el.numFromAttr('data-stars')!
-        const ranked = el.attr('data-eventtype') === 'ranked'
-        const region = el.attr('data-region')
-        const lan = el.attr('lan') === 'lan'
-        const live = el.attr('live') === 'true'
-        const date = undefined
-        const team1 = {
-          id: el.numFromAttr('team1'),
-          name: el.find('.match-teamname').first().text()
-        }
-        const team2 = {
-          id: el.numFromAttr('team2'),
-          name: el.find('.match-teamname').second().text()
-        }
-        const event = {
-          id: el.numFromAttr('data-event-id'),
-          name: el.find('.match-event').first().attr('data-event-headline')
-        }
-        const format = el
+
+        const eventName = el.find('.match-event').first().attr('data-event-headline') || ''
+        const eventLogoEl = el.find('.match-event-logo')
+        const eventLogo = getLogoUrl({ find: () => eventLogoEl })
+
+        const maps = el
           .find('.match-meta:not(.match-meta-live)')
           .text()
+          .trim() || 'bo?'
+
+        const team1El = el.find('.match-teams .match-team').first()
+        const team2El = el.find('.match-teams .match-team').last()
+
+        const teams = [
+          {
+            id: el.numFromAttr('team1'),
+            name: team1El.find('.match-teamname').text().trim(),
+            logo: getLogoUrl(team1El)
+          },
+          {
+            id: el.numFromAttr('team2'),
+            name: team2El.find('.match-teamname').text().trim(),
+            logo: getLogoUrl(team2El)
+          }
+        ]
 
         return {
           id,
-          date,
+          status: 'current' as const,
+          time: new Date().toISOString(),  // 或留 undefined，看你需求
+          event: { name: eventName, logo: eventLogo },
           stars,
-          team1,
-          team2,
-          format,
-          event,
-          live,
-          lan,
-          region,
-          ranked
+          maps,
+          teams
         }
       })
 
+    // Upcoming matches
     const upcomingMatches = $('.matches-event-wrapper')
       .toArray()
-      .map(el => {
-        const event = {
-          id: el.find('.event-headline-wrapper').numFromAttr('data-event-id'),
-          name: el.find('.event-headline-wrapper').attr('data-event-headline')
-        }
+      .flatMap((el) => {
+        const eventName = el.find('.event-headline-wrapper').attr('data-event-headline') || ''
+        const eventLogoEl = el.find('.event-logo img')
+        const eventLogo = getLogoUrl({ find: () => eventLogoEl })
 
         return el.find('.match-wrapper')
           .toArray()
-          .map(matchEl => {
+          .map((matchEl) => {
             const id = matchEl.numFromAttr('data-match-id')!
             const stars = matchEl.numFromAttr('data-stars')!
-            const ranked = matchEl.attr('data-eventtype') === 'ranked'
-            const region = matchEl.attr('data-region')
-            const lan = matchEl.attr('lan') === 'lan'
-            const live = matchEl.attr('live') === 'true'
-            const date = matchEl.find('.match-time').numFromAttr('data-unix')
-            const team1 = {
-              id: matchEl.numFromAttr('team1'),
-              name: matchEl.find('.match-teamname').first().text()
-            }
-            const team2 = {
-              id: matchEl.numFromAttr('team2'),
-              name: matchEl.find('.match-teamname').second().text()
-            }
+            const unixTime = matchEl.find('.match-time').numFromAttr('data-unix')
+            const time = unixTime ? new Date(unixTime).toISOString() : undefined
 
-            const format = matchEl
+            const maps = matchEl
               .find('.match-meta')
               .first()
               .text()
+              .trim() || 'bo?'
+
+            const team1El = matchEl.find('.match-teams .match-team').first()
+            const team2El = matchEl.find('.match-teams .match-team').last()
+
+            const teams = [
+              {
+                id: matchEl.numFromAttr('team1'),
+                name: team1El.find('.match-teamname').text().trim(),
+                logo: getLogoUrl(team1El)
+              },
+              {
+                id: matchEl.numFromAttr('team2'),
+                name: team2El.find('.match-teamname').text().trim(),
+                logo: getLogoUrl(team2El)
+              }
+            ]
 
             return {
               id,
-              date,
+              status: 'upcoming' as const,
+              time,
+              event: { name: eventName, logo: eventLogo },
               stars,
-              team1,
-              team2,
-              format,
-              event,
-              live,
-              lan,
-              region,
-              ranked
+              maps,
+              teams
             }
           })
       })
-    return [...liveMatches, ...upcomingMatches.flat()]
+
+    return [...liveMatches, ...upcomingMatches]
   }
