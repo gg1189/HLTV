@@ -1,6 +1,8 @@
 import { stringify } from 'querystring'
 import { HLTVConfig } from '../config'
 import { HLTVScraper } from '../scraper'
+import { Team } from '../shared/Team'
+import { Event } from '../shared/Event'
 import { fetchPage } from '../utils'
 
 export enum MatchEventType {
@@ -21,21 +23,17 @@ export interface GetMatchesArguments {
   teamIds?: number[]
 }
 
-// 新輸出的 Match 結構（符合你想要的 JSON 格式）
-export interface SimpleMatch {
+export interface MatchPreview {
   id: number
-  time?: string          // ISO string, e.g. "2022-10-24T00:45:00.000Z"
-  event: {
-    name: string
-    logo?: string        // 完整 URL
-  }
+  team1?: Team
+  team2?: Team
+  date?: number
+  format?: string
+  event?: Event
+  live: boolean
   stars: number
-  maps: string           // e.g. "bo3"
-  teams: Array<{
-    id?: number
-    name: string
-    logo?: string        // 完整 URL
-  }>
+  ranked: boolean
+  region: string
 }
 
 export const getMatches =
@@ -45,7 +43,7 @@ export const getMatches =
     eventType,
     filter,
     teamIds
-  }: GetMatchesArguments = {}): Promise<SimpleMatch[]> => {
+  }: GetMatchesArguments = {}): Promise<MatchPreview[]> => {
     const query = stringify({
       ...(eventIds ? { event: eventIds } : {}),
       ...(eventType ? { eventType } : {}),
@@ -56,129 +54,94 @@ export const getMatches =
     const $ = HLTVScraper(
       await fetchPage(`https://www.hltv.org/matches?${query}`, config.loadPage)
     )
-
-    // Helper: 提取 logo URL
-    const getLogoUrl = (el: any): string | undefined => {
-      let src = el.find('img').attr('src') || ''
-
-      if (src.includes('teamplaceholder') || src.includes('dynamic-svg')) {
-        return undefined
-      }
-
-      if (src.startsWith('http')) {
-        return src
-      }
-
-      if (src.startsWith('/')) {
-        return `https://www.hltv.org${src}`
-      }
-
-      return undefined
-    }
-
-    // 處理 live matches
+    // all live matches
     const liveMatches = $('.liveMatches > .match-wrapper')
       .toArray()
       .map((el) => {
         const id = el.numFromAttr('data-match-id')!
         const stars = el.numFromAttr('data-stars')!
-
-        // event
-        const eventName = el.find('.match-event').first().attr('data-event-headline') || ''
-        const eventLogoEl = el.find('.match-event-logo')
-        const eventLogo = getLogoUrl({ find: () => eventLogoEl })
-
-        // format (maps)
-        const maps = el
+        const ranked = el.attr('data-eventtype') === 'ranked'
+        const region = el.attr('data-region')
+        const lan = el.attr('lan') === 'lan'
+        const live = el.attr('live') === 'true'
+        const date = undefined
+        const team1 = {
+          id: el.numFromAttr('team1'),
+          name: el.find('.match-teamname').first().text()
+        }
+        const team2 = {
+          id: el.numFromAttr('team2'),
+          name: el.find('.match-teamname').second().text()
+        }
+        const event = {
+          id: el.numFromAttr('data-event-id'),
+          name: el.find('.match-event').first().attr('data-event-headline')
+        }
+        const format = el
           .find('.match-meta:not(.match-meta-live)')
           .text()
-          .trim() || 'bo?'
-
-        // teams
-        const team1El = el.find('.match-teams .match-team').first()
-        const team2El = el.find('.match-teams .match-team').last()
-
-        const teams = [
-          {
-            id: el.numFromAttr('team1'),
-            name: team1El.find('.match-teamname').text().trim(),
-            logo: getLogoUrl(team1El)
-          },
-          {
-            id: el.numFromAttr('team2'),
-            name: team2El.find('.match-teamname').text().trim(),
-            logo: getLogoUrl(team2El)
-          }
-        ]
 
         return {
           id,
-          time: undefined,           // live match 沒有固定時間，或可改成現在時間
-          event: {
-            name: eventName,
-            logo: eventLogo
-          },
+          date,
           stars,
-          maps,
-          teams
+          team1,
+          team2,
+          format,
+          event,
+          live,
+          lan,
+          region,
+          ranked
         }
       })
 
-    // 處理 upcoming matches
     const upcomingMatches = $('.matches-event-wrapper')
       .toArray()
-      .flatMap((el) => {
-        const eventName = el.find('.event-headline-wrapper').attr('data-event-headline') || ''
-        const eventLogoEl = el.find('.event-logo img')  // upcoming 區塊的 event logo 位置可能不同
-        const eventLogo = getLogoUrl({ find: () => eventLogoEl })
+      .map(el => {
+        const event = {
+          id: el.find('.event-headline-wrapper').numFromAttr('data-event-id'),
+          name: el.find('.event-headline-wrapper').attr('data-event-headline')
+        }
 
         return el.find('.match-wrapper')
           .toArray()
-          .map((matchEl) => {
+          .map(matchEl => {
             const id = matchEl.numFromAttr('data-match-id')!
             const stars = matchEl.numFromAttr('data-stars')!
-            const unixTime = matchEl.find('.match-time').numFromAttr('data-unix')
+            const ranked = matchEl.attr('data-eventtype') === 'ranked'
+            const region = matchEl.attr('data-region')
+            const lan = matchEl.attr('lan') === 'lan'
+            const live = matchEl.attr('live') === 'true'
+            const date = matchEl.find('.match-time').numFromAttr('data-unix')
+            const team1 = {
+              id: matchEl.numFromAttr('team1'),
+              name: matchEl.find('.match-teamname').first().text()
+            }
+            const team2 = {
+              id: matchEl.numFromAttr('team2'),
+              name: matchEl.find('.match-teamname').second().text()
+            }
 
-            const time = unixTime
-              ? new Date(unixTime).toISOString()
-              : undefined
-
-            const maps = matchEl
+            const format = matchEl
               .find('.match-meta')
               .first()
               .text()
-              .trim() || 'bo?'
-
-            const team1El = matchEl.find('.match-teams .match-team').first()
-            const team2El = matchEl.find('.match-teams .match-team').last()
-
-            const teams = [
-              {
-                id: matchEl.numFromAttr('team1'),
-                name: team1El.find('.match-teamname').text().trim(),
-                logo: getLogoUrl(team1El)
-              },
-              {
-                id: matchEl.numFromAttr('team2'),
-                name: team2El.find('.match-teamname').text().trim(),
-                logo: getLogoUrl(team2El)
-              }
-            ]
 
             return {
               id,
-              time,
-              event: {
-                name: eventName,
-                logo: eventLogo
-              },
+              date,
               stars,
-              maps,
-              teams
+              team1,
+              team2,
+              format,
+              event,
+              live,
+              lan,
+              region,
+              ranked
             }
           })
       })
-
-    // 合併並回傳
-    return [...liveMatches, ...upcomingMatches]
+    return [...liveMatches, ...upcomingMatches.flat()]
   }
