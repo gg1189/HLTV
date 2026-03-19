@@ -3,17 +3,19 @@ import { HLTVScraper } from '../scraper'
 import { fetchPage, generateRandomSuffix } from '../utils'
 
 export interface NewsBlock {
-  type: 'paragraph' | 'header' | 'image'
+  type: 'header' | 'paragraph' | 'image' | 'video' | 'list' | 'link' | 'table'
   data: {
     text?: string
     url?: string
-    level?: number  // header 的層級（預設 2）
+    level?: number
+    items?: string[]          // for list
+    src?: string              // for video
   }
 }
 
 export interface NewsContent {
   id: string | number
-  date: string
+  date: string                    // ISO 格式
   title: string
   author: string
   body: {
@@ -32,9 +34,7 @@ export const getNewsContent =
     const $ = HLTVScraper(await fetchPage(url, config.loadPage))
 
     const title = $('h1.headline').text().trim() || '無標題'
-
     const author = $('.author-date-con .author a').text().trim() || '未知作者'
-
     const dateText = $('.date').attr('data-unix')
     const date = dateText ? new Date(Number(dateText)).toISOString() : ''
 
@@ -44,43 +44,63 @@ export const getNewsContent =
     const eventHref = $('.event a').attr('href')
     const eventId = eventHref ? Number(eventHref.match(/\/events\/(\d+)/)?.[1]) : undefined
 
-    // 處理 body blocks
+    // 解析 body blocks
     const blocks: NewsBlock[] = []
 
     $('.newsdsl .newstext-con').children().each((_, el) => {
       const $el = $(el)
 
-      if ($el.is('p')) {
+      // headertext → header
+      if ($el.is('p') && $el.hasClass('headertext')) {
         const text = $el.text().trim()
         if (text) {
-          if ($el.hasClass('headertext')) {
-            // 特別處理 headertext
-            blocks.push({
-              type: 'header',
-              data: { text, level: 2 }  // 預設為 h2 等級
-            })
-          } else {
-            blocks.push({
-              type: 'paragraph',
-              data: { text }
-            })
-          }
+          blocks.push({ type: 'header', data: { text, level: 2 } })
         }
-      } else if ($el.is('img') || $el.is('picture') || $el.is('figure')) {
-        const imgSrc = $el.find('img').attr('src') || $el.attr('src') || $el.find('source').attr('srcset')?.split(' ')[0]
+      }
+      // 普通段落
+      else if ($el.is('p') && $el.hasClass('news-block')) {
+        const text = $el.text().trim()
+        if (text) {
+          blocks.push({ type: 'paragraph', data: { text } })
+        }
+      }
+      // 圖片
+      else if ($el.is('img, picture, figure, .image-con')) {
+        let imgSrc = $el.find('img').attr('src') || $el.attr('src') || $el.find('source').attr('srcset')?.split(' ')[0]
         if (imgSrc) {
-          blocks.push({
-            type: 'image',
-            data: { url: imgSrc }
-          })
+          blocks.push({ type: 'image', data: { url: imgSrc } })
         }
-      } else if ($el.is('h1, h2, h3, h4, h5, h6')) {
-        const level = Number($el.prop('tagName').replace('H', ''))
-        const text = $el.text().trim()
-        if (text) {
+      }
+      // 影片 (iframe)
+      else if ($el.is('.videoCon iframe')) {
+        const src = $el.attr('src')
+        if (src) {
+          blocks.push({ type: 'video', data: { src } })
+        }
+      }
+      // 清單
+      else if ($el.is('ul')) {
+        const items: string[] = []
+        $el.find('li').each((_, li) => {
+          const text = $(li).text().trim()
+          if (text) items.push(text)
+        })
+        if (items.length) {
+          blocks.push({ type: 'list', data: { items } })
+        }
+      }
+      // 表格
+      else if ($el.is('table')) {
+        blocks.push({ type: 'table', data: { text: $el.html() || '' } })
+      }
+      // 連結區塊 (news-read-more)
+      else if ($el.is('.news-read-more-1')) {
+        const linkText = $el.find('.news-read-more-1-bottom').text().trim()
+        const linkHref = $el.attr('href')
+        if (linkText && linkHref) {
           blocks.push({
-            type: 'header',
-            data: { text, level }
+            type: 'link',
+            data: { text: linkText, url: linkHref }
           })
         }
       }
@@ -91,9 +111,7 @@ export const getNewsContent =
       date,
       title,
       author,
-      body: {
-        blocks
-      },
+      body: { blocks },
       image_url,
       event: eventName ? { name: eventName, id: eventId } : undefined
     }
