@@ -7,26 +7,13 @@ export interface RssArticle {
   title: string
   description: string
   link: string
-  image_url?: string  // 新增，可選
-  date: string        // 改成 ISO 格式，例如 "2026-03-19T10:00:00.000Z"
+  date: string  // ISO 8601 格式，例如 "2026-03-19T00:38:00.000Z"
+  image_url?: string  // 可選，從 media:content 提取
 }
 
 const urlify = (text: string) => {
   const urlRegex = /(https?:\/\/[^\s]+)/g
   return text.match(urlRegex)
-}
-
-// 從 description 提取第一張圖片的 src
-const extractImageUrl = (description: string): string | undefined => {
-  const imgRegex = /<img[^>]+src=["'](.*?)["']/i
-  const match = description.match(imgRegex)
-  return match ? match[1] : undefined
-}
-
-// 從 link 提取 ID（例如 /news/12345/title → 12345）
-const extractIdFromLink = (link: string): number => {
-  const match = link.match(/\/news\/(\d+)/)
-  return match ? Number(match[1]) : 0
 }
 
 export const getRssNews =
@@ -39,22 +26,27 @@ export const getRssNews =
       .map((el) => {
         const title = el.find('title').text().trim()
         const description = el.find('description').text().trim()
-        const link = urlify(el.text())?.[0] || ''  // 取第一個 URL 作為 link
+        const link = urlify(el.text())?.[0] || ''
 
-        const pubDateStr = el.find('pubDate').text().trim()
-        const date = pubDateStr ? new Date(pubDateStr).toISOString() : new Date().toISOString()
+        // 提取 id：從 guid 取 hltvnews44130 → 44130
+        const guid = el.find('guid').text().trim()
+        const id = guid.startsWith('hltvnews') ? Number(guid.replace('hltvnews', '')) : 0
 
-        const id = extractIdFromLink(link)
-        const image_url = extractImageUrl(description)
+        // 提取 image_url：從 <media:content url="...">
+        const image_url = el.find('media\\:content').attr('url') || undefined
+
+        // 日期：從 pubDate 轉成 ISO 8601
+        const pubDateText = el.find('pubDate').text().trim()
+        const date = pubDateText ? new Date(pubDateText).toISOString() : ''
 
         return {
           id,
           title,
           description,
           link,
-          image_url,
-          date
+          date,
+          image_url
         }
       })
-      .filter(article => article.id > 0)  // 過濾掉無法提取 ID 的文章
+      .filter(article => article.id > 0)  // 過濾掉沒有 id 的項目
   }
