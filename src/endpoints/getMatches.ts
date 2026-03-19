@@ -60,7 +60,7 @@ export const getMatches =
     // Helper: Make src full URL and skip placeholders
     const getFullLogo = (src?: string): string | undefined => {
       if (!src) return undefined
-      if (src.includes('teamplaceholder') || src.includes('dynamic-svg')) return undefined
+      //if (src.includes('teamplaceholder') || src.includes('dynamic-svg')) return undefined
       if (src.startsWith('http')) return src
       return `https://www.hltv.org${src.startsWith('/') ? '' : '/'}${src}`
     }
