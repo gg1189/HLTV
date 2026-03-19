@@ -4,7 +4,7 @@ import { fetchPage, generateRandomSuffix } from '../utils'
 
 export interface NewsContent {
   id: string | number
-  date: string
+  date: string                    // ISO 格式，例如 "2026-03-19T08:38:00.000Z"
   title: string
   author: string
   body: {
@@ -15,7 +15,7 @@ export interface NewsContent {
     name: string
     id?: number
   }
-  error?: string  // 新增錯誤欄位，用來 debug
+  error?: string                  // debug 用
 }
 
 type BlockType = 'paragraph' | 'header' | 'image' | 'read-more'
@@ -32,7 +32,6 @@ interface Block {
 
 export const getNewsContent =
   (config: HLTVConfig) => async ({ id }: { id: number | string }): Promise<NewsContent> => {
-    // 強制用官方 HLTV URL（不要用 ecfun.org）
     const url = `https://www.hltv.org/news/${id}/${generateRandomSuffix()}`
     console.log(`[DEBUG] 抓取新聞 URL: ${url}`)
 
@@ -40,10 +39,10 @@ export const getNewsContent =
       const html = await fetchPage(url, config.loadPage)
       console.log(`[DEBUG] HTML 長度: ${html.length} 字元`)
 
-      const $ = HLTVScraper(html)
-
-      // log 整個 HTML 前 500 字（debug 用）
+      // 修正：html 是 string，先 log 前 500 字
       console.log('[DEBUG] HTML 前 500 字:', html.substring(0, 500))
+
+      const $ = HLTVScraper(html)
 
       const title = $('h1.headline').text().trim() || '無標題'
       console.log('[DEBUG] 標題:', title)
@@ -69,7 +68,7 @@ export const getNewsContent =
       console.log('[DEBUG] .newstext-con 元素數:', $content.length)
 
       if ($content.length === 0) {
-        console.warn('[WARN] 找不到 .newstext-con，可能是頁面結構變了或非 HLTV 頁面')
+        console.warn('[WARN] 找不到 .newstext-con')
         return {
           id,
           date,
@@ -84,7 +83,7 @@ export const getNewsContent =
 
       $content.children().each((i, el) => {
         const $el = $(el)
-        const tag = $el.prop('tagName').toLowerCase()
+        const tag = $el.prop('tagName')?.toLowerCase() || ''
         console.log(`[DEBUG] Block ${i+1}: <${tag}>`)
 
         if (tag === 'p') {
@@ -133,15 +132,16 @@ export const getNewsContent =
         image_url: mainImage,
         event: eventName ? { name: eventName, id: eventId } : undefined
       }
-    } catch (err) {
-      console.error('[ERROR] getNewsContent 失敗:', err.message || err)
+    } catch (err: unknown) {
+      const errorMsg = err instanceof Error ? err.message : String(err)
+      console.error('[ERROR] getNewsContent 失敗:', errorMsg)
       return {
         id,
         date: '',
         title: '錯誤',
         author: '系統',
         body: { blocks: [] },
-        error: err.message || '抓取失敗，請檢查 URL 或網路'
+        error: errorMsg || '抓取失敗，請檢查 URL 或網路'
       }
     }
   }
