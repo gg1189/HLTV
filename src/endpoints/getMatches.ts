@@ -24,17 +24,17 @@ export interface GetMatchesArguments {
 export interface SimpleMatch {
   id: number
   status: 'current' | 'upcoming'
-  time?: string          // ISO string, for upcoming it's scheduled time, for current it's optional/current time
+  time?: string          // ISO string
   event: {
     name: string
-    logo?: string
+    logo?: string        // full URL
   }
   stars: number
   maps: string
   teams: Array<{
     id?: number
     name: string
-    logo?: string
+    logo?: string        // full URL
   }>
 }
 
@@ -57,13 +57,28 @@ export const getMatches =
       await fetchPage(`https://www.hltv.org/matches?${query}`, config.loadPage)
     )
 
+    // Helper to extract full logo URL
     const getLogoUrl = (el: any): string | undefined => {
-      let src = el.find('img').attr('src') || ''
+      // Support multiple selectors for live and upcoming
+      let imgEls = el.find('img.match-event-logo, img.event-logo img, img.match-team-logo, img')
 
+      if (imgEls.length === 0) return undefined
+
+      // Prefer night-only or day-only if exists
+      let src =
+        imgEls.filter('.night-only').attr('src') ||
+        imgEls.filter('.day-only').attr('src') ||
+        imgEls.first().attr('src') ||
+        ''
+
+      if (!src) return undefined
+
+      // Skip placeholders
       if (src.includes('teamplaceholder') || src.includes('dynamic-svg')) {
         return undefined
       }
 
+      // Make sure it's full URL
       if (src.startsWith('http')) return src
       if (src.startsWith('/')) return `https://www.hltv.org${src}`
 
@@ -78,8 +93,8 @@ export const getMatches =
         const stars = el.numFromAttr('data-stars')!
 
         const eventName = el.find('.match-event').first().attr('data-event-headline') || ''
-        const eventLogoEl = el.find('.match-event-logo')
-        const eventLogo = getLogoUrl({ find: () => eventLogoEl })
+        const eventLogoEl = el.find('.match-event-logo-container')
+        const eventLogo = getLogoUrl(eventLogoEl)
 
         const maps = el
           .find('.match-meta:not(.match-meta-live)')
@@ -105,7 +120,7 @@ export const getMatches =
         return {
           id,
           status: 'current' as const,
-          time: new Date().toISOString(),  // 或留 undefined，看你需求
+          time: new Date().toISOString(),  // current time for live matches
           event: { name: eventName, logo: eventLogo },
           stars,
           maps,
@@ -118,8 +133,8 @@ export const getMatches =
       .toArray()
       .flatMap((el) => {
         const eventName = el.find('.event-headline-wrapper').attr('data-event-headline') || ''
-        const eventLogoEl = el.find('.event-logo img')
-        const eventLogo = getLogoUrl({ find: () => eventLogoEl })
+        const eventLogoEl = el.find('.event-logo')
+        const eventLogo = getLogoUrl(eventLogoEl)
 
         return el.find('.match-wrapper')
           .toArray()
@@ -163,5 +178,6 @@ export const getMatches =
           })
       })
 
+    // Combine and return
     return [...liveMatches, ...upcomingMatches]
   }
