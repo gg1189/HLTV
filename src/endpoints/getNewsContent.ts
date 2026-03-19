@@ -1,10 +1,11 @@
 import { HLTVConfig } from '../config'
 import { HLTVScraper } from '../scraper'
 import { fetchPage, generateRandomSuffix } from '../utils'
+import type { CheerioAPI } from 'cheerio'  // ← 新增這行匯入 CheerioAPI 型別
 
 export interface NewsContent {
   id: string | number
-  date: string
+  date: string                    // ISO 格式，例如 "2026-03-19T08:38:00.000Z"
   title: string
   author: string
   body: {
@@ -35,17 +36,19 @@ export const getNewsContent =
       if (!html || typeof html !== 'string' || html.trim() === '') {
         throw new Error('fetchPage 回傳無效 HTML（空或非字串）')
       }
-    } catch (err) {
-      console.error('fetchPage 失敗:', err)
-      throw new Error(`無法載入新聞頁面: ${err.message}`)
+    } catch (err: unknown) {
+      const errorMsg = err instanceof Error ? err.message : String(err)
+      console.error('fetchPage 失敗:', errorMsg)
+      throw new Error(`無法載入新聞頁面: ${errorMsg}`)
     }
 
-    let $
+    let $: CheerioAPI
     try {
       $ = HLTVScraper(html)
-    } catch (err) {
-      console.error('HLTVScraper 錯誤:', err)
-      throw new Error(`cheerio 解析失敗: ${err.message}`)
+    } catch (err: unknown) {
+      const errorMsg = err instanceof Error ? err.message : String(err)
+      console.error('HLTVScraper 錯誤:', errorMsg)
+      throw new Error(`cheerio 解析失敗: ${errorMsg}`)
     }
 
     // 以下保持原邏輯，但加防呆
@@ -58,7 +61,7 @@ export const getNewsContent =
     const eventId = eventHref ? Number(eventHref.match(/\/events\/(\d+)/)?.[1]) : undefined
     const image_url = $('.image-con picture source').attr('srcset')?.split(' ')[0] || undefined
 
-    // blocks 提取（已確認在 browser console 成功）
+    // blocks 提取（跟 browser console 測試一樣）
     const blocks: NewsContent['body']['blocks'] = []
 
     $('.newstext-con').children().each((_, el) => {
