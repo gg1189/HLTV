@@ -22,17 +22,16 @@ import { getPastEvents } from './endpoints/getPastEvents'
 import { getResults } from './endpoints/getResults'
 import { getNews } from './endpoints/getNews'
 import { getRssNews } from './endpoints/getRssNews'
+import { getNewsContent } from './endpoints/getNewsContent'  // ← 新增這行匯出 getNewsContent
 
 export class Hltv {
   constructor(private config: Partial<HLTVConfig> = {}) {
     if (config.httpAgent && !config.loadPage) {
       config.loadPage = defaultLoadPage(config.httpAgent)
     }
-
     if (!config.httpAgent) {
       config.httpAgent = defaultConfig.httpAgent
     }
-
     if (!config.loadPage) {
       config.loadPage = defaultConfig.loadPage
     }
@@ -60,6 +59,7 @@ export class Hltv {
   getResults = getResults(this.config as HLTVConfig)
   getNews = getNews(this.config as HLTVConfig)
   getRssNews = getRssNews(this.config as HLTVConfig)
+  getNewsContent = getNewsContent(this.config as HLTVConfig)  // ← 新增這行，讓 HLTV.getNewsContent 可用
   connectToScorebot = connectToScorebot(this.config as HLTVConfig)
 
   public createInstance(config: Partial<HLTVConfig>) {
@@ -68,16 +68,15 @@ export class Hltv {
 
   public TEAM_PLACEHOLDER_IMAGE =
     'https://www.hltv.org/img/static/team/placeholder.svg'
-
   public PLAYER_PLACEHOLDER_IMAGE =
     'https://static.hltv.org/images/playerprofile/bodyshot/unknown.png'
 }
 
 const hltv = new Hltv()
-
 export default hltv
 export { hltv as HLTV }
 
+// 匯出型別（保持原有，並新增 getNewsContent 相關型別）
 export { MatchStatus } from './endpoints/getMatch'
 export type {
   Highlight,
@@ -147,6 +146,7 @@ export {
   ContentFilter,
   GameType
 } from './endpoints/getResults'
+
 export type {
   FullMatchResult,
   ResultTeam,
@@ -157,11 +157,15 @@ export type { NewsPreview, GetNewsArguments } from './endpoints/getNews'
 
 export type { RssArticle } from './endpoints/getRssNews'
 
+// 新增匯出 getNewsContent 的型別
+export type { NewsContent } from './endpoints/getNewsContent'
+
 export { GameMap } from './shared/GameMap'
 export { MatchFormat } from './shared/MatchFormat'
 export { RankingFilter } from './shared/RankingFilter'
 export { MatchType } from './shared/MatchType'
 export { BestOfFilter } from './shared/BestOfFilter'
+
 export type { Article } from './shared/Article'
 export type { Country } from './shared/Country'
 export type { Event } from './shared/Event'
