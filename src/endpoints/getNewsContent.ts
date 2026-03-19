@@ -38,7 +38,7 @@ export const getNewsContent =
     const dateText = $('.date').attr('data-unix')
     const date = dateText ? new Date(Number(dateText)).toISOString() : ''
 
-    const image_url = $('.image-con picture source').attr('srcset')?.split(' ')[0] || undefined
+    const image_url = $('.image-con img').attr('src') || $('.image-con picture source').attr('srcset')?.split(' ')[0] || undefined
 
     const eventName = $('.event a').text().trim()
     const eventHref = $('.event a').attr('href')
@@ -47,11 +47,12 @@ export const getNewsContent =
     // 抓取內容並轉成 blocks 結構
     const blocks: NewsBlock[] = []
 
-    // 遍歷 .newstext-con 裡的所有 p、img、h 等元素
+    // 遍歷 .newstext-con 裡的所有子元素
     $('.newsdsl .newstext-con').children().each((_, el) => {
       const $el = $(el)
+      const tag = $el.prop('tagName').toLowerCase()
 
-      if ($el.is('p')) {
+      if (tag === 'p') {
         const text = $el.text().trim()
         if (text) {
           blocks.push({
@@ -59,7 +60,7 @@ export const getNewsContent =
             data: { text }
           })
         }
-      } else if ($el.is('img') || $el.is('picture') || $el.is('figure')) {
+      } else if (tag === 'img' || tag === 'picture' || tag === 'figure') {
         const imgSrc = $el.find('img').attr('src') || $el.attr('src') || $el.find('source').attr('srcset')?.split(' ')[0]
         if (imgSrc) {
           blocks.push({
@@ -67,8 +68,8 @@ export const getNewsContent =
             data: { url: imgSrc }
           })
         }
-      } else if ($el.is('h1, h2, h3, h4, h5, h6')) {
-        const level = Number($el.prop('tagName').replace('H', ''))
+      } else if (tag.startsWith('h')) {
+        const level = Number(tag.replace('h', ''))
         const text = $el.text().trim()
         if (text) {
           blocks.push({
