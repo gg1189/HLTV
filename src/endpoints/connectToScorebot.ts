@@ -2,23 +2,7 @@ import * as io from 'socket.io-client'
 import { fetchPage, generateRandomSuffix } from '../utils'
 import { HLTVConfig } from '../config'
 
-// 所有型別定義保持原樣（省略重複部分，確保你檔案裡有這些 interface）
-type Side = 'CT' | 'TERRORIST' | 'SPECTATOR'
-
-type LogEvent =
-  | RoundStart
-  | RoundEnd
-  | Restart
-  | MatchStarted
-  | Kill
-  | Assist
-  | Suicide
-  | BombDefused
-  | BombPlanted
-  | PlayerJoin
-  | PlayerQuit
-
-// ... (你的所有 interface 如 RoundStart, ScoreboardUpdate, LogUpdate 等)
+// 型別定義保持原樣（省略重複部分）
 
 type ConnectToScorebotParams = {
   id: number
@@ -46,22 +30,28 @@ export const connectToScorebot =
       const baseUrl = $('#scoreboardElement').attr('data-scorebot-url')
 
       if (!baseUrl) {
-        throw new Error('無法提取 data-scorebot-url，請確認 match 是否 live')
+        throw new Error('無法提取 data-scorebot-url')
       }
 
-      // 固定基底，但用 polling 先連線取得 sid
-      const pollingUrl = baseUrl.replace(/^https?:\/\//, 'https://') + '/socket.io/'
+      // 強制轉成 wss:// + /socket.io/
+      let wsUrl = baseUrl.replace(/^https?:\/\//, 'wss://')
+      if (!wsUrl.endsWith('/')) wsUrl += '/'
+      wsUrl += 'socket.io/'
 
-      console.log('開始 polling 取得 sid，使用 URL:', pollingUrl)
+      // 加 matchId 參數
+      wsUrl += `?matchId=${id}`
 
-      // 先用 polling 建立連線，取得 sid
-      const socket = io.connect(pollingUrl, {
+      console.log('直接 websocket URL:', wsUrl)
+
+      const socket = io.connect(wsUrl, {
         agent: !config.httpAgent,
-        transports: ['polling'],  // 先用 polling
+        transports: ['websocket'], // 只用 websocket，不 polling
         reconnection: true,
-        reconnectionAttempts: 5,
+        reconnectionAttempts: 10,
         reconnectionDelay: 1000,
-        timeout: 20000
+        reconnectionDelayMax: 5000,
+        timeout: 30000,
+        forceNew: true
       })
 
       const matchIdStr = id.toString()
@@ -73,11 +63,7 @@ export const connectToScorebot =
       let reconnected = false
 
       socket.on('connect', () => {
-        console.log('polling 連線成功！嘗試升級到 websocket')
-
-        // 升級到 websocket
-        socket.io.opts.transports = ['websocket']
-        socket.io.opts.upgrade = true
+        console.log('websocket 已連線成功！')
 
         const done = () => socket.close()
 
@@ -125,6 +111,6 @@ export const connectToScorebot =
 
       return socket
     }).catch(err => {
-      console.error('fetchPage 失敗:', err)
+      console.error('初始化失敗:', err)
     })
   }
