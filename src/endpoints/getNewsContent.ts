@@ -7,7 +7,7 @@ export interface NewsContent {
   date: string                    // ISO 格式，例如 "2026-03-19T08:38:00.000Z"
   title: string
   author: string
-  content: string
+  body: string
   image_url?: string
   event?: {
     name: string
@@ -28,7 +28,7 @@ export const getNewsContent =
     const dateText = $('.date').attr('data-unix')
     const date = dateText ? new Date(Number(dateText)).toISOString() : ''
 
-    const content = $('.newsdsl .newstext-con').html() || ''
+    const body = $('.newsdsl .newstext-con').html() || ''
 
     const image_url = $('.image-con picture source').attr('srcset')?.split(' ')[0] || undefined
 
@@ -42,7 +42,7 @@ export const getNewsContent =
       date,
       title,
       author,
-      content,
+      body,
       image_url,
       event: eventName ? { name: eventName, id: eventId } : undefined
     }
