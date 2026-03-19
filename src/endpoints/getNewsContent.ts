@@ -4,14 +4,14 @@ import { fetchPage, generateRandomSuffix } from '../utils'
 
 export interface NewsContent {
   id: string | number
+  date: string                    // ISO 格式，例如 "2026-03-19T08:38:00.000Z"
   title: string
   author: string
-  date: string  // ISO 格式，例如 "2026-03-19T08:38:00.000Z"
   content: string
   image_url?: string
   event?: {
     name: string
-    id: number
+    id?: number                   // 改成 optional (number | undefined)
   }
 }
 
@@ -21,9 +21,9 @@ export const getNewsContent =
     const url = `https://www.hltv.org/news/${id}/${generateRandomSuffix()}`
     const $ = HLTVScraper(await fetchPage(url, config.loadPage))
 
-    const title = $('h1.headline').text().trim()
+    const title = $('h1.headline').text().trim() || '無標題'
 
-    const author = $('.author-date-con .author a').text().trim() || 'Unknown'
+    const author = $('.author-date-con .author a').text().trim() || '未知作者'
 
     const dateText = $('.date').attr('data-unix')
     const date = dateText ? new Date(Number(dateText)).toISOString() : ''
@@ -34,7 +34,8 @@ export const getNewsContent =
 
     const eventName = $('.event a').text().trim()
     const eventHref = $('.event a').attr('href')
-    const eventId = eventHref ? Number(eventHref.match(/\/events\/(\d+)/)?.[1]) : undefined
+    const eventIdMatch = eventHref?.match(/\/events\/(\d+)/)
+    const eventId = eventIdMatch ? Number(eventIdMatch[1]) : undefined
 
     return {
       id,
