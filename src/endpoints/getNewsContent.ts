@@ -4,61 +4,63 @@ import { fetchPage } from '../utils'
 
 export interface NewsContent {
   id: number
-  date: string          // ISO 格式，例如 "2026-03-19T08:38:00.000Z"
+  date: string                    // ISO 8601 格式，例如 "2026-03-19T10:00:00.000Z"
   title: string
-  description: string
-  content: string       // 完整文章 HTML
-  image_url?: string
-  author?: string
+  author: string
   event?: {
     name: string
-    id?: number
+    logo?: string
   }
+  image_url?: string
+  content: string                 // 完整文章文字（去掉 HTML 標籤）
+  rawHtml?: string                // 可選：原始 HTML（如果你需要保留格式）
 }
 
 export const getNewsContent =
   (config: HLTVConfig) =>
-  async (newsId: number): Promise<NewsContent> => {
-    const url = `https://www.hltv.org/news/${newsId}`
+  async ({ id }: { id: number }): Promise<NewsContent> => {
+    const url = `https://www.hltv.org/news/${id}/${generateRandomSuffix()}`
     const $ = HLTVScraper(await fetchPage(url, config.loadPage))
 
-    // 提取 id（從 URL 或頁面確認）
-    const id = newsId
+    // 提取 id（從 URL 或 fallback）
+    const articleId = id
 
-    // 提取日期（從 .date data-unix 轉 ISO）
-    const dateUnix = $('.date').attr('data-unix')
-    const date = dateUnix ? new Date(Number(dateUnix)).toISOString() : ''
+    // 提取 date（從 .date[data-unix] 轉成 ISO）
+    const unixTime = $('.date').attr('data-unix')
+    const date = unixTime ? new Date(Number(unixTime)).toISOString() : ''
 
-    const title = $('.headline').text().trim()
-    const description = $('.headertext').text().trim() || ''
+    // 提取 title
+    const title = $('h1.headline').text().trim()
 
-    // 完整內容：抓 .newstext-con 內的所有 HTML
-    const contentEl = $('.newstext-con')
-    const content = contentEl.html() || ''
+    // 提取 author
+    const author = $('.author a.authorName span').text().trim()
 
-    // 主圖片：從第一個 .image-con img
-    const image_url = contentEl.find('.image-con img').first().attr('src') || undefined
+    // 提取 event
+    const eventName = $('.event a').text().trim()
+    const eventLogo = $('.event img').attr('src')
+    const event = eventName ? { name: eventName, logo: eventLogo } : undefined
 
-    // 作者
-    const author = $('.authorName span').text().trim() || undefined
+    // 提取主圖
+    const image_url = $('.image-con img, .newsdsl img').first().attr('src') || undefined
 
-    // 相關賽事（如果有）
-    const eventEl = $('.event a')
-    const event = eventEl.length
-      ? {
-          name: eventEl.text().trim(),
-          id: Number(eventEl.attr('href')?.match(/\/events\/(\d+)/)?.[1] || undefined)
-        }
-      : undefined
+    // 提取完整內容（去掉 HTML 標籤，只留純文字）
+    let content = ''
+    $('.newstext-con p, .newstext-con div').each((_, el) => {
+      const text = $(el).text().trim()
+      if (text) content += text + '\n\n'
+    })
+
+    // 可選：保留原始 HTML
+    const rawHtml = $('.newstext-con').html() || ''
 
     return {
-      id,
+      id: articleId,
       date,
       title,
-      description,
-      content,
-      image_url,
       author,
-      event
+      event,
+      image_url,
+      content: content.trim(),
+      rawHtml // 如果你需要 HTML 格式可保留，否則可刪除
     }
   }
