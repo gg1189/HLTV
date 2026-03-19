@@ -3,12 +3,11 @@ import { HLTVScraper } from '../scraper'
 import { fetchPage, generateRandomSuffix } from '../utils'
 
 export interface NewsBlock {
-  type: 'header' | 'paragraph' | 'image' | 'video' | 'list' | 'table' | 'html'
+  type: 'paragraph' | 'header' | 'image'
   data: {
     text?: string
     url?: string
-    level?: number
-    html?: string
+    level?: number  // header 的層級（預設 2）
   }
 }
 
@@ -30,13 +29,7 @@ export interface NewsContent {
 export const getNewsContent =
   (config: HLTVConfig) => async ({ id }: { id: number | string }): Promise<NewsContent> => {
     const url = `https://www.hltv.org/news/${id}/${generateRandomSuffix()}`
-    let $: cheerio.Root
-
-    try {
-      $ = HLTVScraper(await fetchPage(url, config.loadPage))
-    } catch (err) {
-      throw new Error(`頁面載入失敗: ${err.message}`)
-    }
+    const $ = HLTVScraper(await fetchPage(url, config.loadPage))
 
     const title = $('h1.headline').text().trim() || '無標題'
 
@@ -45,89 +38,62 @@ export const getNewsContent =
     const dateText = $('.date').attr('data-unix')
     const date = dateText ? new Date(Number(dateText)).toISOString() : ''
 
-    const image_url = $('.image-con picture source, .image-con img').attr('srcset')?.split(' ')[0] ||
-                      $('.image-con img').attr('src') || undefined
+    const image_url = $('.image-con picture source').attr('srcset')?.split(' ')[0] || undefined
 
     const eventName = $('.event a').text().trim()
     const eventHref = $('.event a').attr('href')
     const eventId = eventHref ? Number(eventHref.match(/\/events\/(\d+)/)?.[1]) : undefined
 
-    // 安全處理 blocks
+    // 處理 body blocks
     const blocks: NewsBlock[] = []
-    const container = $('.newsdsl .newstext-con')
 
-    if (!container.length) {
-      blocks.push({
-        type: 'paragraph',
-        data: { text: '內容無法提取，請檢查新聞 ID 或頁面結構' }
-      })
-    } else {
-      container.contents().each((_, el) => {
-        const $el = $(el)
+    $('.newsdsl .newstext-con').children().each((_, el) => {
+      const $el = $(el)
 
-        if ($el.is('p')) {
-          const text = $el.text().trim()
-          if (text) {
-            if ($el.hasClass('headertext')) {
-              blocks.push({
-                type: 'header',
-                data: { text, level: 2 }
-              })
-            } else {
-              blocks.push({
-                type: 'paragraph',
-                data: { text }
-              })
-            }
-          }
-        } else if ($el.is('img, picture, figure')) {
-          const imgSrc = $el.find('img').attr('src') || $el.attr('src') || $el.find('source').attr('srcset')?.split(' ')[0]
-          if (imgSrc) {
-            blocks.push({
-              type: 'image',
-              data: { url: imgSrc }
-            })
-          }
-        } else if ($el.is('h1, h2, h3, h4, h5, h6')) {
-          const level = Number($el.prop('tagName').replace('H', ''))
-          const text = $el.text().trim()
-          if (text) {
+      if ($el.is('p')) {
+        const text = $el.text().trim()
+        if (text) {
+          if ($el.hasClass('headertext')) {
+            // 特別處理 headertext
             blocks.push({
               type: 'header',
-              data: { text, level }
+              data: { text, level: 2 }  // 預設為 h2 等級
             })
-          }
-        } else if ($el.is('ul, ol')) {
-          const items = $el.find('li').map((_, li) => $(li).text().trim()).get()
-          if (items.length) {
+          } else {
             blocks.push({
-              type: 'list',
-              data: { text: items.join('\n') }
-            })
-          }
-        } else if ($el.is('table')) {
-          blocks.push({
-            type: 'table',
-            data: { html: $el.html() || '' }
-          })
-        } else if ($el.is('div.videoCon, iframe')) {
-          const videoUrl = $el.find('iframe').attr('src') || $el.attr('src')
-          if (videoUrl) {
-            blocks.push({
-              type: 'video',
-              data: { url: videoUrl }
+              type: 'paragraph',
+              data: { text }
             })
           }
         }
-      })
-    }
+      } else if ($el.is('img') || $el.is('picture') || $el.is('figure')) {
+        const imgSrc = $el.find('img').attr('src') || $el.attr('src') || $el.find('source').attr('srcset')?.split(' ')[0]
+        if (imgSrc) {
+          blocks.push({
+            type: 'image',
+            data: { url: imgSrc }
+          })
+        }
+      } else if ($el.is('h1, h2, h3, h4, h5, h6')) {
+        const level = Number($el.prop('tagName').replace('H', ''))
+        const text = $el.text().trim()
+        if (text) {
+          blocks.push({
+            type: 'header',
+            data: { text, level }
+          })
+        }
+      }
+    })
 
     return {
       id,
       date,
       title,
       author,
-      body: { blocks },
+      body: {
+        blocks
+      },
       image_url,
       event: eventName ? { name: eventName, id: eventId } : undefined
     }
