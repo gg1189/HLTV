@@ -4,11 +4,11 @@ import { fetchPage } from '../utils'
 
 export interface RssArticle {
   id: number
+  date: string          // ISO 格式，例如 "2026-03-19T00:38:00.000Z"
   title: string
   description: string
   link: string
-  date: string  // ISO 8601 格式，例如 "2026-03-19T00:38:00.000Z"
-  image_url?: string  // 可選，從 media:content 提取
+  image_url?: string    // 可選，從 media:content 提取
 }
 
 const urlify = (text: string) => {
@@ -32,21 +32,21 @@ export const getRssNews =
         const guid = el.find('guid').text().trim()
         const id = guid.startsWith('hltvnews') ? Number(guid.replace('hltvnews', '')) : 0
 
-        // 提取 image_url：從 <media:content url="...">
-        const image_url = el.find('media\\:content').attr('url') || undefined
-
         // 日期：從 pubDate 轉成 ISO 8601
         const pubDateText = el.find('pubDate').text().trim()
         const date = pubDateText ? new Date(pubDateText).toISOString() : ''
 
+        // 提取 image_url
+        const image_url = el.find('media\\:content').attr('url') || undefined
+
         return {
           id,
+          date,
           title,
           description,
           link,
-          date,
           image_url
         }
       })
-      .filter(article => article.id > 0)  // 過濾掉沒有 id 的項目
+      .filter(article => article.id > 0)  // 過濾掉無效項目
   }
