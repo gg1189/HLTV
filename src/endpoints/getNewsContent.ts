@@ -3,17 +3,17 @@ import { HLTVScraper } from '../scraper'
 import { fetchPage, generateRandomSuffix } from '../utils'
 
 export interface NewsBlock {
-  type: 'paragraph' | 'header' | 'image'
+  type: 'paragraph' | 'image' | 'header'
   data: {
     text?: string
     url?: string
-    level?: number  // header 的層級（預設 2）
+    level?: number  // 如果是 header
   }
 }
 
 export interface NewsContent {
   id: string | number
-  date: string
+  date: string                    // ISO 格式，例如 "2026-03-19T08:38:00.000Z"
   title: string
   author: string
   body: {
@@ -44,27 +44,20 @@ export const getNewsContent =
     const eventHref = $('.event a').attr('href')
     const eventId = eventHref ? Number(eventHref.match(/\/events\/(\d+)/)?.[1]) : undefined
 
-    // 處理 body blocks
+    // 抓取內容並轉成 blocks 結構
     const blocks: NewsBlock[] = []
 
+    // 遍歷 .newstext-con 裡的所有 p、img、h 等元素
     $('.newsdsl .newstext-con').children().each((_, el) => {
       const $el = $(el)
 
       if ($el.is('p')) {
         const text = $el.text().trim()
         if (text) {
-          if ($el.hasClass('headertext')) {
-            // 特別處理 headertext
-            blocks.push({
-              type: 'header',
-              data: { text, level: 2 }  // 預設為 h2 等級
-            })
-          } else {
-            blocks.push({
-              type: 'paragraph',
-              data: { text }
-            })
-          }
+          blocks.push({
+            type: 'paragraph',
+            data: { text }
+          })
         }
       } else if ($el.is('img') || $el.is('picture') || $el.is('figure')) {
         const imgSrc = $el.find('img').attr('src') || $el.attr('src') || $el.find('source').attr('srcset')?.split(' ')[0]
