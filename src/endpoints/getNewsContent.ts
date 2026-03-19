@@ -1,68 +1,49 @@
 import { HLTVConfig } from '../config'
 import { HLTVScraper } from '../scraper'
-import { fetchPage, generateRandomSuffix } from '../utils'  // 確保匯入 generateRandomSuffix
+import { fetchPage, generateRandomSuffix } from '../utils'
 
 export interface NewsContent {
-  id: number
-  date: string                    // ISO 8601 格式，例如 "2026-03-19T10:00:00.000Z"
+  id: string | number
+  date: string                    // ISO 格式，例如 "2026-03-19T08:38:00.000Z"
   title: string
   author: string
+  content: string
+  image_url?: string
   event?: {
     name: string
-    logo?: string
+    id?: number                   // 改成 optional (number | undefined)
   }
-  image_url?: string
-  content: string                 // 完整文章文字
-  rawHtml?: string                // 原始 HTML（可選）
 }
 
 export const getNewsContent =
-  (config: HLTVConfig) =>
-  async ({ id }: { id: number }): Promise<NewsContent> => {
+  (config: HLTVConfig) => async ({ id }: { id: number | string }): Promise<NewsContent> => {
+    // 加 generateRandomSuffix() 避免重複請求被擋
     const url = `https://www.hltv.org/news/${id}/${generateRandomSuffix()}`
     const $ = HLTVScraper(await fetchPage(url, config.loadPage))
 
-    // 提取 id（從參數）
-    const articleId = id
+    const title = $('h1.headline').text().trim() || '無標題'
 
-    // 提取 date（從 .date[data-unix]）
-    const unixTime = $('.date').attr('data-unix')
-    const date = unixTime ? new Date(Number(unixTime)).toISOString() : ''
+    const author = $('.author-date-con .author a').text().trim() || '未知作者'
 
-    // 提取 title
-    const title = $('h1.headline').text().trim()
+    const dateText = $('.date').attr('data-unix')
+    const date = dateText ? new Date(Number(dateText)).toISOString() : ''
 
-    // 提取 author
-    const author = $('.author a.authorName span').text().trim()
+    const content = $('.newsdsl .newstext-con').html() || ''
 
-    // 提取 event
+    const image_url = $('.image-con picture source').attr('srcset')?.split(' ')[0] || undefined
+
     const eventName = $('.event a').text().trim()
-    const eventLogo = $('.event img').attr('src')
-    const event = eventName ? { name: eventName, logo: eventLogo } : undefined
-
-    // 提取主圖（從 .image-con img 或 .newsdsl img）
-    const image_url = $('.image-con img, .newsdsl img').first().attr('src') || undefined
-
-    // 提取完整內容（純文字，從 .newstext-con p, div）
-    let content = ''
-    $('.newstext-con p, .newstext-con div').each((_, el) => {
-      const text = $(el).text().trim()
-      if (text && text.length > 10) {  // 過濾空行或短文字
-        content += text + '\n\n'
-      }
-    })
-
-    // 原始 HTML（可選）
-    const rawHtml = $('.newstext-con').html() || ''
+    const eventHref = $('.event a').attr('href')
+    const eventIdMatch = eventHref?.match(/\/events\/(\d+)/)
+    const eventId = eventIdMatch ? Number(eventIdMatch[1]) : undefined
 
     return {
-      id: articleId,
+      id,
       date,
       title,
       author,
-      event,
+      content,
       image_url,
-      content: content.trim(),
-      rawHtml
+      event: eventName ? { name: eventName, id: eventId } : undefined
     }
   }
