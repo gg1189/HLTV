@@ -57,31 +57,11 @@ export const getMatches =
       await fetchPage(`https://www.hltv.org/matches?${query}`, config.loadPage)
     )
 
-    // Helper to get full logo URL
-    const getLogoUrl = (el: any): string | undefined => {
-      const imgEl = el.find('img')
-      if (imgEl.length === 0) return undefined
-
-      let src = imgEl.first().attr('src') || ''
-
-      // Prefer night-only if multiple
-      if (!src && imgEl.length > 1) {
-        src = imgEl.filter('.night-only').attr('src') ||
-              imgEl.filter('.day-only').attr('src') ||
-              imgEl.first().attr('src') || ''
-      }
-
+    // Helper: Make src full URL and skip placeholders
+    const getFullLogo = (src?: string): string | undefined => {
       if (!src) return undefined
-
-      // Skip placeholders
-      if (src.includes('teamplaceholder') || src.includes('dynamic-svg')) {
-        return undefined
-      }
-
-      // Full URL
+      if (src.includes('teamplaceholder') || src.includes('dynamic-svg')) return undefined
       if (src.startsWith('http')) return src
-
-      // Relative to full
       return `https://www.hltv.org${src.startsWith('/') ? '' : '/'}${src}`
     }
 
@@ -93,29 +73,25 @@ export const getMatches =
         const stars = el.numFromAttr('data-stars')!
 
         const eventName = el.find('.match-event').first().attr('data-event-headline') || ''
-        const eventLogoEl = el.find('.match-event-logo-container, .match-event')
-        const eventLogo = getLogoUrl(eventLogoEl)
+        const eventLogoSrc = el.find('img.match-event-logo').first().attr('src')
+        const eventLogo = getFullLogo(eventLogoSrc)
 
-        const maps = el
-          .find('.match-meta:not(.match-meta-live)')
-          .text()
-          .trim() || 'bo?'
+        const maps = el.find('.match-meta:not(.match-meta-live)').text().trim() || 'bo?'
 
         const team1El = el.find('.match-teams .match-team').first()
         const team2El = el.find('.match-teams .match-team').last()
 
-        const teams = [
-          {
-            id: el.numFromAttr('team1'),
-            name: team1El.find('.match-teamname').text().trim(),
-            logo: getLogoUrl(team1El)
-          },
-          {
-            id: el.numFromAttr('team2'),
-            name: team2El.find('.match-teamname').text().trim(),
-            logo: getLogoUrl(team2El)
-          }
-        ]
+        const team1 = {
+          id: el.numFromAttr('team1'),
+          name: team1El.find('.match-teamname').text().trim(),
+          logo: getFullLogo(team1El.find('img.match-team-logo').first().attr('src'))
+        }
+
+        const team2 = {
+          id: el.numFromAttr('team2'),
+          name: team2El.find('.match-teamname').text().trim(),
+          logo: getFullLogo(team2El.find('img.match-team-logo').first().attr('src'))
+        }
 
         return {
           id,
@@ -124,22 +100,21 @@ export const getMatches =
           event: { name: eventName, logo: eventLogo },
           stars,
           maps,
-          teams
+          teams: [team1, team2]
         }
       })
 
-    // Upcoming matches - 使用與 getResults 類似的選擇器
+    // Upcoming matches (using direct class selectors like getResults)
     const upcomingMatches = $('.matches-event-wrapper')
       .toArray()
       .flatMap((eventEl) => {
-        // Event logo: 參考 getResults 的方式，使用 img.event-logo 或 img.match-event-logo
-        const eventLogoEl = eventEl.find('img.event-logo, img.match-event-logo')
-        const eventLogo = getLogoUrl(eventLogoEl)
+        // Event logo & name - direct like getResults
+        const eventLogoSrc = eventEl.find('img.match-event-logo').first().attr('src')
+        const eventLogo = getFullLogo(eventLogoSrc)
 
-        const eventName =
-          eventEl.find('.event-headline-wrapper').attr('data-event-headline') ||
-          eventEl.find('.event-headline-text').text().trim() ||
-          ''
+        const eventName = eventEl.find('.event-headline-wrapper').attr('data-event-headline') ||
+                          eventEl.find('.event-headline-text').text().trim() ||
+                          ''
 
         return eventEl.find('.match-wrapper')
           .toArray()
@@ -149,39 +124,32 @@ export const getMatches =
             const unixTime = matchEl.find('.match-time').numFromAttr('data-unix')
             const time = unixTime ? new Date(unixTime).toISOString() : undefined
 
-            const maps = matchEl
-              .find('.match-meta')
-              .first()
-              .text()
-              .trim() || 'bo?'
+            const maps = matchEl.find('.match-meta').first().text().trim() || 'bo?'
 
-            const team1El = matchEl.find('.match-teams .match-team.team1')
-            const team2El = matchEl.find('.match-teams .match-team.team2')
+            // Team logos - direct like getResults
+            const team1El = matchEl.find('.match-team.team1')
+            const team2El = matchEl.find('.match-team.team2')
 
-            const teams = [
-              {
-                id: matchEl.numFromAttr('team1'),
-                name: team1El.find('.match-teamname').text().trim(),
-                logo: getLogoUrl(team1El)
-              },
-              {
-                id: matchEl.numFromAttr('team2'),
-                name: team2El.find('.match-teamname').text().trim(),
-                logo: getLogoUrl(team2El)
-              }
-            ]
+            const team1 = {
+              id: matchEl.numFromAttr('team1'),
+              name: team1El.find('.match-teamname').text().trim(),
+              logo: getFullLogo(team1El.find('img.match-team-logo').first().attr('src'))
+            }
+
+            const team2 = {
+              id: matchEl.numFromAttr('team2'),
+              name: team2El.find('.match-teamname').text().trim(),
+              logo: getFullLogo(team2El.find('img.match-team-logo').first().attr('src'))
+            }
 
             return {
               id,
               status: 'upcoming' as const,
               time,
-              event: {
-                name: eventName,
-                logo: eventLogo
-              },
+              event: { name: eventName, logo: eventLogo },
               stars,
               maps,
-              teams
+              teams: [team1, team2]
             }
           })
       })
