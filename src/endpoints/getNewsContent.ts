@@ -7,11 +7,18 @@ export interface NewsContent {
   date: string                    // ISO 格式，例如 "2026-03-19T08:38:00.000Z"
   title: string
   author: string
-  content: string
+  body: {
+    blocks: Array<{
+      data: {
+        text: string
+      }
+      type: 'paragraph'
+    }>
+  }
   image_url?: string
   event?: {
     name: string
-    id?: number                   // 改成 optional (number | undefined)
+    id?: number
   }
 }
 
@@ -28,8 +35,6 @@ export const getNewsContent =
     const dateText = $('.date').attr('data-unix')
     const date = dateText ? new Date(Number(dateText)).toISOString() : ''
 
-    const content = $('.newsdsl .newstext-con').html() || ''
-
     const image_url = $('.image-con picture source').attr('srcset')?.split(' ')[0] || undefined
 
     const eventName = $('.event a').text().trim()
@@ -37,12 +42,26 @@ export const getNewsContent =
     const eventIdMatch = eventHref?.match(/\/events\/(\d+)/)
     const eventId = eventIdMatch ? Number(eventIdMatch[1]) : undefined
 
+    // 提取所有 <p> 轉成 blocks
+    const blocks: { data: { text: string }; type: 'paragraph' }[] = []
+    $('.newsdsl .newstext-con p').each((_, el) => {
+      const text = $(el).text().trim()
+      if (text) {
+        blocks.push({
+          data: { text },
+          type: 'paragraph'
+        })
+      }
+    })
+
+    const body = { blocks }
+
     return {
       id,
       date,
       title,
       author,
-      content,
+      body,
       image_url,
       event: eventName ? { name: eventName, id: eventId } : undefined
     }
