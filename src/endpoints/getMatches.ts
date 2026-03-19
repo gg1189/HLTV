@@ -57,14 +57,15 @@ export const getMatches =
       await fetchPage(`https://www.hltv.org/matches?${query}`, config.loadPage)
     )
 
-    // Helper function to get full logo URL
+    // Helper to get full logo URL
     const getLogoUrl = (el: any): string | undefined => {
-      // Find the img element
       let imgEl = el.find('img')
+      if (imgEl.length === 0) return undefined
+
       let src = imgEl.attr('src') || ''
 
-      // If multiple images (day/night), prefer night-only or first one
-      if (!src) {
+      // Handle day/night variants if multiple imgs
+      if (!src && imgEl.length > 1) {
         src = imgEl.filter('.night-only').attr('src') ||
               imgEl.filter('.day-only').attr('src') ||
               imgEl.first().attr('src') || ''
@@ -77,25 +78,22 @@ export const getMatches =
         return undefined
       }
 
-      // Already full URL
-      if (src.startsWith('http://') || src.startsWith('https://')) {
-        return src
-      }
+      // Full URL already
+      if (src.startsWith('http')) return src
 
-      // Relative path → make full
+      // Relative → full
       return `https://www.hltv.org${src.startsWith('/') ? '' : '/'}${src}`
     }
 
-    // Live matches (current)
+    // Live / current matches
     const liveMatches = $('.liveMatches > .match-wrapper')
       .toArray()
       .map((el) => {
         const id = el.numFromAttr('data-match-id')!
         const stars = el.numFromAttr('data-stars')!
 
-        // Event info
         const eventName = el.find('.match-event').first().attr('data-event-headline') || ''
-        const eventLogoEl = el.find('.match-event-logo-container')
+        const eventLogoEl = el.find('.match-event-logo-container') // or .match-event img
         const eventLogo = getLogoUrl(eventLogoEl)
 
         const maps = el
@@ -122,26 +120,26 @@ export const getMatches =
         return {
           id,
           status: 'current' as const,
-          time: new Date().toISOString(), // or undefined if you prefer no time for live
-          event: {
-            name: eventName,
-            logo: eventLogo
-          },
+          time: new Date().toISOString(),
+          event: { name: eventName, logo: eventLogo },
           stars,
           maps,
           teams
         }
       })
 
-    // Upcoming matches (with event logo)
+    // Upcoming matches - FIXED event logo selector
     const upcomingMatches = $('.matches-event-wrapper')
       .toArray()
       .flatMap((eventEl) => {
-        // Event logo for upcoming section
-        const eventLogoEl = eventEl.find('.event-logo')
+        // Updated selector for event logo in upcoming sections
+        const eventHeadlineEl = eventEl.find('.event-headline-wrapper, .event-headline-content')
+        const eventLogoEl = eventHeadlineEl.find('img.match-event-logo, img') // match-event-logo class from your HTML
         const eventLogo = getLogoUrl(eventLogoEl)
 
-        const eventName = eventEl.find('.event-headline-wrapper').attr('data-event-headline') || ''
+        const eventName = eventEl.find('.event-headline-wrapper').attr('data-event-headline') ||
+                          eventHeadlineEl.find('.event-headline-text').text().trim() ||
+                          ''
 
         return eventEl.find('.match-wrapper')
           .toArray()
@@ -157,8 +155,8 @@ export const getMatches =
               .text()
               .trim() || 'bo?'
 
-            const team1El = matchEl.find('.match-teams .match-team').first()
-            const team2El = matchEl.find('.match-teams .match-team').last()
+            const team1El = matchEl.find('.match-teams .match-team.team1')
+            const team2El = matchEl.find('.match-teams .match-team.team2')
 
             const teams = [
               {
@@ -188,6 +186,5 @@ export const getMatches =
           })
       })
 
-    // Combine and return
     return [...liveMatches, ...upcomingMatches]
   }
