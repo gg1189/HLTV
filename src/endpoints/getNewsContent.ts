@@ -23,7 +23,7 @@ export const getNewsContent =
 
     const title = $('h1.headline').text().trim() || '無標題'
 
-    const author = $('.author-date-con .author a').text().trim() || '未知作者'
+    const author = $('.authorName').text().trim() || '未知作者'
 
     const dateText = $('.date').attr('data-unix')
     const date = dateText ? new Date(Number(dateText)).toISOString() : ''
