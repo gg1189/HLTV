@@ -1,7 +1,7 @@
 import * as io from 'socket.io-client'
-import { fetchPage, generateRandomSuffix } from '../utils'
 import { HLTVConfig } from '../config'
 
+// 所有 interface 保持不變
 type Side = 'CT' | 'TERRORIST' | 'SPECTATOR'
 
 type LogEvent =
@@ -205,66 +205,100 @@ export const connectToScorebot =
     onConnect,
     onDisconnect
   }: ConnectToScorebotParams) => {
-    fetchPage(
-      `https://www.hltv.org/matches/${id}/${generateRandomSuffix()}`,
-      config.loadPage
-    ).then(($) => {
-      const url = $('#scoreboardElement')
-        .attr('data-scorebot-url')!
-        .split(',')
-        .pop()!
-      const matchId = $('#scoreboardElement').attr('data-scorebot-id')
+    // 基底 URL 永遠固定（根據你提供的資訊）
+    const baseUrl = 'https://scorebot-lb.hltv.org'
 
-      const socket = io.connect(url, {
-        agent: !config.httpAgent
-      })
+    // 轉成 websocket URL
+    let wsUrl = baseUrl.replace(/^https?:\/\//, 'wss://')
 
-      const initObject = JSON.stringify({
-        token: '',
-        listId: matchId
-      })
+    // 加上 socket.io 路徑（如果沒有）
+    if (!wsUrl.includes('/socket.io/')) {
+      if (!wsUrl.endsWith('/')) wsUrl += '/'
+      wsUrl += 'socket.io/'
+    }
 
-      let reconnected = false
+    console.log('生成的 websocket URL:', wsUrl)  // debug
 
-      socket.on('connect', () => {
-        const done = () => socket.close()
+    // 建立連線
+    const socket = io.connect(wsUrl, {
+      agent: !config.httpAgent,
+      transports: ['websocket'],  // 優先使用 websocket
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      timeout: 20000
+    })
 
-        if (onConnect) {
-          onConnect()
-        }
+    // 準備 readyForMatch 事件 payload
+    const matchIdStr = id.toString()
+    const initObject = JSON.stringify({
+      token: '',  // 目前不需要 token
+      listId: matchIdStr
+    })
 
-        if (!reconnected) {
-          socket.emit('readyForMatch', initObject)
-        }
+    let reconnected = false
 
-        socket.on('scoreboard', (data: ScoreboardUpdate) => {
-          if (onScoreboardUpdate) {
-            onScoreboardUpdate(data, done)
-          }
-        })
+    socket.on('connect', () => {
+      console.log('socket 已連線成功！')  // debug
 
-        socket.on('log', (data: string) => {
-          if (onLogUpdate) {
-            onLogUpdate(JSON.parse(data), done)
-          }
-        })
+      const done = () => {
+        console.log('主動關閉 socket')
+        socket.close()
+      }
 
-        socket.on('fullLog', (data: any) => {
-          if (onFullLogUpdate) {
-            onFullLogUpdate(JSON.parse(data), done)
-          }
-        })
-      })
+      if (onConnect) {
+        onConnect()
+      }
 
-      socket.on('reconnect', () => {
-        reconnected = true
+      if (!reconnected) {
+        console.log('發送 readyForMatch 事件:', initObject)
         socket.emit('readyForMatch', initObject)
+      }
+
+      socket.on('scoreboard', (data: ScoreboardUpdate) => {
+        console.log('收到 scoreboard 更新')
+        if (onScoreboardUpdate) {
+          onScoreboardUpdate(data, done)
+        }
       })
 
-      socket.on('disconnect', () => {
-        if (onDisconnect) {
-          onDisconnect()
+      socket.on('log', (data: string) => {
+        console.log('收到 log 更新')
+        if (onLogUpdate) {
+          onLogUpdate(JSON.parse(data), done)
+        }
+      })
+
+      socket.on('fullLog', (data: any) => {
+        console.log('收到 fullLog 更新')
+        if (onFullLogUpdate) {
+          onFullLogUpdate(JSON.parse(data), done)
         }
       })
     })
+
+    socket.on('reconnect', () => {
+      reconnected = true
+      console.log('重新連線，重新發送 readyForMatch')
+      socket.emit('readyForMatch', initObject)
+    })
+
+    socket.on('disconnect', (reason) => {
+      console.log('socket 斷線，原因:', reason)
+      if (onDisconnect) {
+        onDisconnect()
+      }
+    })
+
+    socket.on('connect_error', (err) => {
+      console.error('連線錯誤:', err.message || err)
+    })
+
+    socket.on('error', (err) => {
+      console.error('socket error:', err)
+    })
+
+    // 回傳 socket 物件，讓外部可以 close
+    return socket
   }
