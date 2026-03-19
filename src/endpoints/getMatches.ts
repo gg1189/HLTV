@@ -59,12 +59,12 @@ export const getMatches =
 
     // Helper to get full logo URL
     const getLogoUrl = (el: any): string | undefined => {
-      let imgEl = el.find('img')
+      const imgEl = el.find('img')
       if (imgEl.length === 0) return undefined
 
-      let src = imgEl.attr('src') || ''
+      let src = imgEl.first().attr('src') || ''
 
-      // Handle day/night variants if multiple imgs
+      // Prefer night-only if multiple
       if (!src && imgEl.length > 1) {
         src = imgEl.filter('.night-only').attr('src') ||
               imgEl.filter('.day-only').attr('src') ||
@@ -78,14 +78,14 @@ export const getMatches =
         return undefined
       }
 
-      // Full URL already
+      // Full URL
       if (src.startsWith('http')) return src
 
-      // Relative → full
+      // Relative to full
       return `https://www.hltv.org${src.startsWith('/') ? '' : '/'}${src}`
     }
 
-    // Live / current matches
+    // Live matches
     const liveMatches = $('.liveMatches > .match-wrapper')
       .toArray()
       .map((el) => {
@@ -93,7 +93,7 @@ export const getMatches =
         const stars = el.numFromAttr('data-stars')!
 
         const eventName = el.find('.match-event').first().attr('data-event-headline') || ''
-        const eventLogoEl = el.find('.match-event-logo-container') // or .match-event img
+        const eventLogoEl = el.find('.match-event-logo-container, .match-event')
         const eventLogo = getLogoUrl(eventLogoEl)
 
         const maps = el
@@ -128,18 +128,18 @@ export const getMatches =
         }
       })
 
-    // Upcoming matches - FIXED event logo selector
+    // Upcoming matches - 使用與 getResults 類似的選擇器
     const upcomingMatches = $('.matches-event-wrapper')
       .toArray()
       .flatMap((eventEl) => {
-        // Updated selector for event logo in upcoming sections
-        const eventHeadlineEl = eventEl.find('.event-headline-wrapper, .event-headline-content')
-        const eventLogoEl = eventHeadlineEl.find('img.match-event-logo, img') // match-event-logo class from your HTML
+        // Event logo: 參考 getResults 的方式，使用 img.event-logo 或 img.match-event-logo
+        const eventLogoEl = eventEl.find('img.event-logo, img.match-event-logo')
         const eventLogo = getLogoUrl(eventLogoEl)
 
-        const eventName = eventEl.find('.event-headline-wrapper').attr('data-event-headline') ||
-                          eventHeadlineEl.find('.event-headline-text').text().trim() ||
-                          ''
+        const eventName =
+          eventEl.find('.event-headline-wrapper').attr('data-event-headline') ||
+          eventEl.find('.event-headline-text').text().trim() ||
+          ''
 
         return eventEl.find('.match-wrapper')
           .toArray()
