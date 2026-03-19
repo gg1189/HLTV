@@ -24,17 +24,17 @@ export interface GetMatchesArguments {
 export interface SimpleMatch {
   id: number
   status: 'current' | 'upcoming'
-  time?: string          // ISO string
+  time?: string
   event: {
     name: string
-    logo?: string        // full URL
+    logo?: string
   }
   stars: number
   maps: string
   teams: Array<{
     id?: number
     name: string
-    logo?: string        // full URL
+    logo?: string
   }>
 }
 
@@ -57,19 +57,18 @@ export const getMatches =
       await fetchPage(`https://www.hltv.org/matches?${query}`, config.loadPage)
     )
 
-    // Helper to extract full logo URL
+    // Helper function to get full logo URL
     const getLogoUrl = (el: any): string | undefined => {
-      // Support multiple selectors for live and upcoming
-      let imgEls = el.find('img.match-event-logo, img.event-logo img, img.match-team-logo, img')
+      // Find the img element
+      let imgEl = el.find('img')
+      let src = imgEl.attr('src') || ''
 
-      if (imgEls.length === 0) return undefined
-
-      // Prefer night-only or day-only if exists
-      let src =
-        imgEls.filter('.night-only').attr('src') ||
-        imgEls.filter('.day-only').attr('src') ||
-        imgEls.first().attr('src') ||
-        ''
+      // If multiple images (day/night), prefer night-only or first one
+      if (!src) {
+        src = imgEl.filter('.night-only').attr('src') ||
+              imgEl.filter('.day-only').attr('src') ||
+              imgEl.first().attr('src') || ''
+      }
 
       if (!src) return undefined
 
@@ -78,11 +77,13 @@ export const getMatches =
         return undefined
       }
 
-      // Make sure it's full URL
-      if (src.startsWith('http')) return src
-      if (src.startsWith('/')) return `https://www.hltv.org${src}`
+      // Already full URL
+      if (src.startsWith('http://') || src.startsWith('https://')) {
+        return src
+      }
 
-      return undefined
+      // Relative path → make full
+      return `https://www.hltv.org${src.startsWith('/') ? '' : '/'}${src}`
     }
 
     // Live matches (current)
@@ -92,6 +93,7 @@ export const getMatches =
         const id = el.numFromAttr('data-match-id')!
         const stars = el.numFromAttr('data-stars')!
 
+        // Event info
         const eventName = el.find('.match-event').first().attr('data-event-headline') || ''
         const eventLogoEl = el.find('.match-event-logo-container')
         const eventLogo = getLogoUrl(eventLogoEl)
@@ -120,23 +122,28 @@ export const getMatches =
         return {
           id,
           status: 'current' as const,
-          time: new Date().toISOString(),  // current time for live matches
-          event: { name: eventName, logo: eventLogo },
+          time: new Date().toISOString(), // or undefined if you prefer no time for live
+          event: {
+            name: eventName,
+            logo: eventLogo
+          },
           stars,
           maps,
           teams
         }
       })
 
-    // Upcoming matches
+    // Upcoming matches (with event logo)
     const upcomingMatches = $('.matches-event-wrapper')
       .toArray()
-      .flatMap((el) => {
-        const eventName = el.find('.event-headline-wrapper').attr('data-event-headline') || ''
-        const eventLogoEl = el.find('.event-logo')
+      .flatMap((eventEl) => {
+        // Event logo for upcoming section
+        const eventLogoEl = eventEl.find('.event-logo')
         const eventLogo = getLogoUrl(eventLogoEl)
 
-        return el.find('.match-wrapper')
+        const eventName = eventEl.find('.event-headline-wrapper').attr('data-event-headline') || ''
+
+        return eventEl.find('.match-wrapper')
           .toArray()
           .map((matchEl) => {
             const id = matchEl.numFromAttr('data-match-id')!
@@ -170,7 +177,10 @@ export const getMatches =
               id,
               status: 'upcoming' as const,
               time,
-              event: { name: eventName, logo: eventLogo },
+              event: {
+                name: eventName,
+                logo: eventLogo
+              },
               stars,
               maps,
               teams
