@@ -147,7 +147,7 @@ const attachMethods = (root: cheerio.Cheerio): HLTVPageElement => {
 
     hasClass(className: string): HLTVPageElement {
           return attachMethods(root.hasClass(className))
-    }
+    },
 
     index(): number {
       return root.index()
