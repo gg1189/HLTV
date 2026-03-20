@@ -65,7 +65,7 @@ export const getNewsContent =
 
     if (contentContainer.exists()) {
       contentContainer.children().each((i, el) => {
-        if ($el.hasClass('headertext')) {
+        if ($(el).hasClass('headertext')) {
           const text = $el.trimText()
           if (text) {
             blocks.push({
