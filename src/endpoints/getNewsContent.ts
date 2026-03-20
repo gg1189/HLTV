@@ -58,7 +58,7 @@ export const getNewsContent =
 
     if (contentContainer.exists()) {
       contentContainer.children().each((i, el) => {
-        const el = $(el)
+
         const text = el.trimText()
 
         if (!text) return
