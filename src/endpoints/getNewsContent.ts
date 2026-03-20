@@ -7,10 +7,9 @@ export interface NewsContent {
   date: string                    // ISO format, e.g. "2026-03-19T08:38:00.000Z"
   title: string
   author: string
-  content?: string                // optional: raw joined text
   body: {
     blocks: Array<{
-      type: 'paragraph' | 'header'  // 可擴展 quote / image / list 等
+      type: 'paragraph' | 'header'  // 可未來擴展 quote / image / list 等
       data: {
         text: string
       }
@@ -58,7 +57,7 @@ export const getNewsContent =
       eventId = match ? Number(match[1]) : undefined
     }
 
-    // ── 核心：提取 blocks ──
+    // ── 提取 blocks ──
     const blocks: NewsContent['body']['blocks'] = []
 
     const contentContainer = $('.newsdsl .newstext-con').first()
@@ -95,7 +94,7 @@ export const getNewsContent =
         })
       })
 
-      // 如果完全沒抓到 .news-block，可 fallback 取所有 p 標籤
+      // fallback：如果完全沒抓到 .news-block，嘗試所有 p 標籤
       if (blocks.length === 0) {
         contentContainer.children('p').each((i, el) => {
           const text = el.trimText()
@@ -109,28 +108,26 @@ export const getNewsContent =
       }
     }
 
-    // 加入開頭介紹段落（可選，模仿你提供的範例）
-    if (blocks.length > 0 && blocks[0].type !== 'header') {
-      const introText = `${title} as of ${new Date(date).toLocaleDateString('en-US', {
+    // 加入開頭介紹段落（模仿你提供的範例格式）
+    if (blocks.length > 0) {
+      const introDate = new Date(date).toLocaleDateString('en-US', {
         month: 'long',
         day: 'numeric',
         year: 'numeric'
-      })}, which significantly alters the game's core mechanics.`
+      })
+      const introText = `${title} as of ${introDate}, which significantly alters the game's core mechanics.`
+
       blocks.unshift({
         type: 'paragraph',
         data: { text: introText }
       })
     }
 
-    // 純文字版本（可選保留）
-    const rawContent = blocks.map(b => b.data.text).join('\n\n').trim()
-
     return {
       id,
       date,
       title,
       author,
-      content: rawContent || undefined,  // 可移除此欄位
       body: {
         blocks
       },
