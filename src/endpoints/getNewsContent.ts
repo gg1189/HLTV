@@ -65,10 +65,10 @@ export const getNewsContent =
 
     if (contentContainer.exists()) {
       contentContainer.children().each((i, child) => {
-        const $child = $(child)   // ← crucial: wrap the raw element
 
-        if ($child.hasClass('headertext')) {
-          const text = $child.trimText()
+
+        if (child.hasClass('headertext')) {
+          const text = child.trimText()
           if (text) {
             blocks.push({
               type: 'header',
@@ -76,8 +76,8 @@ export const getNewsContent =
             })
           }
         }
-        else if ($child.hasClass('image-con')) {
-          const imgSrc = $child.find('img').attr('src')
+        else if (child.hasClass('image-con')) {
+          const imgSrc = child.find('img').attr('src')
           if (imgSrc) {
             blocks.push({
               type: 'image',
@@ -85,8 +85,8 @@ export const getNewsContent =
             })
           }
         }
-        else if ($child.hasClass('news-block')) {
-          const text = $child.trimText()
+        else if (child.hasClass('news-block')) {
+          const text = child.trimText()
           if (text) {
             blocks.push({
               type: 'paragraph',
