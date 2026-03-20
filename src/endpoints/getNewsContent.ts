@@ -42,7 +42,7 @@ export const getNewsContent =
       ? new Date(dateUnix * 1000).toISOString()
       : new Date().toISOString()
 
-    // 主圖（保留原本邏輯）
+    // Main image (kept as fallback / featured image)
     let image_url: string | undefined
     const srcset = $('.image-con picture source').attr('srcset')
     if (srcset) {
@@ -58,43 +58,39 @@ export const getNewsContent =
       eventId = match ? Number(match[1]) : undefined
     }
 
-    // ── 提取 blocks ──
+    // ── Extract blocks in original DOM order ──
     const blocks: NewsContent['body']['blocks'] = []
 
     const contentContainer = $('.newsdsl .newstext-con').first()
 
     if (contentContainer.exists()) {
-      // headertext → header
-      contentContainer.children('.headertext').each((i, el) => {
-        const text = el.trimText()
-        if (text) {
-          blocks.push({
-            type: 'header',
-            data: { text }
-          })
+      contentContainer.children().each((i, el) => {
+        if (el.hasClass('headertext')) {
+          const text = el.trimText()
+          if (text) {
+            blocks.push({
+              type: 'header',
+              data: { text }
+            })
+          }
+        } else if (el.hasClass('image-con')) {
+          const imgSrc = el.find('img').attr('src')
+          if (imgSrc) {
+            blocks.push({
+              type: 'image',
+              data: { url: imgSrc }
+            })
+          }
+        } else if (el.hasClass('news-block')) {
+          const text = el.trimText()
+          if (text) {
+            blocks.push({
+              type: 'paragraph',
+              data: { text }
+            })
+          }
         }
-      })
-
-      // image-con → image (只取 img src)
-      contentContainer.children('.image-con').each((i, el) => {
-        const imgSrc = el.find('img').attr('src')
-        if (imgSrc) {
-          blocks.push({
-            type: 'image',
-            data: { url: imgSrc }
-          })
-        }
-      })
-
-      // news-block → paragraph
-      contentContainer.children('.news-block').each((i, el) => {
-        const text = el.trimText()
-        if (text) {
-          blocks.push({
-            type: 'paragraph',
-            data: { text }
-          })
-        }
+        // other direct children (e.g. the "read more" <a>) are simply ignored
       })
     }
 
