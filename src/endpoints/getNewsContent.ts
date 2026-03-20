@@ -54,7 +54,7 @@ export const getNewsContent =
     // ── 提取 blocks，按頁面順序 push ──
     const blocks: NewsContent['body']['blocks'] = []
 
-    const contentContainer = $('.newsdsl .newstext-con').first()
+    const contentContainer = $('.newstext-con').first()
 
     if (contentContainer.exists()) {
       contentContainer.children().each((i, el) => {
