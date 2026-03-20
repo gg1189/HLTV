@@ -9,22 +9,14 @@ export interface NewsContent {
   author: string
   body: {
     blocks: Array<{
-      type: 'paragraph' | 'header' | 'image' | 'table'
+      type: 'paragraph' | 'header' | 'image'
       data: {
-        text?: string          // paragraph / header
-        url?: string           // image
-        eventName?: string     // table
-        matches?: Array<{
-          date: string
-          time: string
-          team1: string
-          team2: string
-          matchLink: string
-        }>
+        text?: string          // for paragraph/header
+        url?: string           // for image
       }
     }>
   }
-  image_url?: string
+  image_url?: string           // 保留原主圖（可選，如果有頭圖）
   event?: {
     name: string
     id?: number
@@ -46,10 +38,11 @@ export const getNewsContent =
       ? new Date(dateUnix * 1000).toISOString()
       : new Date().toISOString()
 
+    // 主圖（如果新聞有頭圖，可保留）
     let image_url: string | undefined
-    const srcsetMain = $('.image-con picture source').attr('srcset')
-    if (srcsetMain) {
-      image_url = srcsetMain.split(',')[0]?.trim().split(' ')[0]
+    const srcset = $('.image-con picture source').attr('srcset')
+    if (srcset) {
+      image_url = srcset.split(',')[0]?.trim().split(' ')[0]
     }
 
     const eventName = $('.event a').trimText()
@@ -60,16 +53,14 @@ export const getNewsContent =
       eventId = match ? Number(match[1]) : undefined
     }
 
-    // ── 提取 blocks ──
+    // ── 提取 blocks，按原始順序 ──
     const blocks: NewsContent['body']['blocks'] = []
 
     const contentContainer = $('.newsdsl .newstext-con').first()
 
     if (contentContainer.exists()) {
-      // 擴大範圍：抓所有相關子元素
-      const relevantChildren = contentContainer
-        .children('p.headertext, p.news-block, div.image-con, table.table-container')
-        .toArray()
+      // 抓所有相關的直接子元素（p.headertext, p.news-block, div.image-con）
+      const relevantChildren = contentContainer.children('p.headertext, p.news-block, div.image-con').toArray()
 
       relevantChildren.forEach((el) => {
         const className = el.attr('class') || ''
@@ -91,51 +82,18 @@ export const getNewsContent =
             })
           }
         } else if (className.includes('image-con')) {
+          // 從 picture source 或 img 抓圖片 URL
           let imgUrl = el.find('picture source').attr('srcset')?.split(',')[0]?.trim().split(' ')[0]
+
+          // fallback 到 img src
           if (!imgUrl) {
             imgUrl = el.find('img').attr('src')
           }
+
           if (imgUrl) {
             blocks.push({
               type: 'image',
               data: { url: imgUrl }
-            })
-          }
-        } else if (className.includes('table-container')) {
-          // 處理嵌入的賽事表格
-          const tableEventName = el.find('.event-header-cell a').trimText() || 'Unknown event'
-
-          const matches: any[] = []
-
-          el.find('tbody tr.team-row').each((i, rowEl) => {
-            const $row = $(rowEl)
-
-            const date = $row.find('.date-cell span').text().trim() || ''
-            const time = $row.find('.time-cell span').text().trim() || ''
-
-            const team1 = $row.find('.team-1').trimText() || ''
-            const team2 = $row.find('.team-2').trimText() || ''
-
-            const matchLink = $row.find('.stats-button').attr('href') || ''
-
-            if (team1 && team2) {
-              matches.push({
-                date,
-                time,
-                team1,
-                team2,
-                matchLink: matchLink ? `https://www.hltv.org${matchLink}` : undefined
-              })
-            }
-          })
-
-          if (matches.length > 0) {
-            blocks.push({
-              type: 'table',
-              data: {
-                eventName: tableEventName,
-                matches
-              }
             })
           }
         }
@@ -150,7 +108,7 @@ export const getNewsContent =
       body: {
         blocks
       },
-      image_url,
+      image_url,  // 如果有頭圖，可保留；或設為 undefined
       event: eventName ? { name: eventName, id: eventId } : undefined
     }
   }
