@@ -9,13 +9,14 @@ export interface NewsContent {
   author: string
   body: {
     blocks: Array<{
-      type: 'paragraph' | 'header'
+      type: 'paragraph' | 'header' | 'image'
       data: {
-        text: string
+        text?: string          // for paragraph/header
+        url?: string           // for image
       }
     }>
   }
-  image_url?: string
+  image_url?: string           // 保留原主圖（可選，如果有頭圖）
   event?: {
     name: string
     id?: number
@@ -37,6 +38,7 @@ export const getNewsContent =
       ? new Date(dateUnix * 1000).toISOString()
       : new Date().toISOString()
 
+    // 主圖（如果新聞有頭圖，可保留）
     let image_url: string | undefined
     const srcset = $('.image-con picture source').attr('srcset')
     if (srcset) {
@@ -51,30 +53,49 @@ export const getNewsContent =
       eventId = match ? Number(match[1]) : undefined
     }
 
-    // ── 提取 blocks ──
+    // ── 提取 blocks，按原始順序 ──
     const blocks: NewsContent['body']['blocks'] = []
 
     const contentContainer = $('.newsdsl .newstext-con').first()
 
     if (contentContainer.exists()) {
-      const relevantChildren = contentContainer.children('p.headertext, p.news-block').toArray()
+      // 抓所有相關的直接子元素（p.headertext, p.news-block, div.image-con）
+      const relevantChildren = contentContainer.children('p.headertext, p.news-block, div.image-con').toArray()
 
       relevantChildren.forEach((el) => {
-        const text = el.trimText()
-        if (!text) return
-
         const className = el.attr('class') || ''
 
         if (className.includes('headertext')) {
-          blocks.push({
-            type: 'header',
-            data: { text }
-          })
+          const text = el.trimText()
+          if (text) {
+            blocks.push({
+              type: 'header',
+              data: { text }
+            })
+          }
         } else if (className.includes('news-block')) {
-          blocks.push({
-            type: 'paragraph',
-            data: { text }
-          })
+          const text = el.trimText()
+          if (text) {
+            blocks.push({
+              type: 'paragraph',
+              data: { text }
+            })
+          }
+        } else if (className.includes('image-con')) {
+          // 從 picture source 或 img 抓圖片 URL
+          let imgUrl = el.find('picture source').attr('srcset')?.split(',')[0]?.trim().split(' ')[0]
+
+          // fallback 到 img src
+          if (!imgUrl) {
+            imgUrl = el.find('img').attr('src')
+          }
+
+          if (imgUrl) {
+            blocks.push({
+              type: 'image',
+              data: { url: imgUrl }
+            })
+          }
         }
       })
     }
@@ -87,7 +108,7 @@ export const getNewsContent =
       body: {
         blocks
       },
-      image_url,
+      image_url,  // 如果有頭圖，可保留；或設為 undefined
       event: eventName ? { name: eventName, id: eventId } : undefined
     }
   }
