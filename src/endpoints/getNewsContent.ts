@@ -1,6 +1,6 @@
 import { HLTVConfig } from '../config'
 import { HLTVScraper } from '../scraper'
-import { fetchPage, generateRandomSuffix } from '../utils'
+import { fetchPasge, generateRandomSuffix } from '../utils'
 
 export interface NewsContent {
   id: string | number
