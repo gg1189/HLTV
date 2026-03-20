@@ -66,7 +66,7 @@ export const getNewsContent =
       contentContainer.children().each((i, child) => {
 
         const text = child.trimText()
-        const classAttr = child.attr('class') || ''
+        const classAttr = $child.attr('class') || ''
 
         if (classAttr.includes('headertext') && text) {
           blocks.push({
