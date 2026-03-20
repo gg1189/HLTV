@@ -66,9 +66,9 @@ export const getNewsContent =
     if (contentContainer.exists()) {
       // 按原始 DOM 順序遍歷所有直接子元素
       contentContainer.children().each((i, el) => {
-        const test2 = $(el)  // 包裝成 HLTVPageElement 才能用 trimText() 等方法
+        // el 已經是 HLTVPageElement，直接使用
 
-        if (test2.hasClass('headertext')) {
+        if (el.hasClass('headertext')) {
           const text = el.trimText()
           if (text) {
             blocks.push({
@@ -77,8 +77,9 @@ export const getNewsContent =
             })
           }
         }
-        else if (test2.hasClass('image-con')) {
-          const imgSrc = test2.find('img').attr('src')
+        else if (el.hasClass('image-con')) {
+          // 取第一個 img 的 src
+          const imgSrc = el.find('img').first().attr('src')
           if (imgSrc) {
             blocks.push({
               type: 'image',
@@ -86,7 +87,7 @@ export const getNewsContent =
             })
           }
         }
-        else if (test2.hasClass('news-block')) {
+        else if (el.hasClass('news-block')) {
           const text = el.trimText()
           if (text) {
             blocks.push({
@@ -95,7 +96,7 @@ export const getNewsContent =
             })
           }
         }
-        // 其他子元素（如 .news-read-more-1）直接忽略
+        // 其他子元素（如 read-more 區塊）會被忽略
       })
     }
 
