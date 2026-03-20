@@ -36,13 +36,13 @@ export const getNewsContent =
     // Author
     const author = $('.author-date-con .author a').trimText() || 'Unknown author'
 
-    // Date
+    // Date (data-unix is usually seconds → ×1000 for ms)
     const dateUnix = $('.date').numFromAttr('data-unix')
     const date = dateUnix
       ? new Date(dateUnix * 1000).toISOString()
-      : new Date().toISOString()
+      : new Date().toISOString() // fallback to now
 
-    // 主圖（保留）
+    // Main featured image (optional fallback)
     let image_url: string | undefined
     const srcset = $('.image-con picture source').attr('srcset')
     if (srcset) {
@@ -58,14 +58,14 @@ export const getNewsContent =
       eventId = match ? Number(match[1]) : undefined
     }
 
-    // ── 提取 blocks ──
-const blocks: NewsContent['body']['blocks'] = []
+    // ── Extract blocks in original DOM order ──
+    const blocks: NewsContent['body']['blocks'] = []
 
     const contentContainer = $('.newsdsl .newstext-con').first()
 
     if (contentContainer.exists()) {
       contentContainer.children().each((i, child) => {
-        const $child = $(child)   // 這行非常重要！
+        const $child = $(child)   // ← crucial: wrap the raw element
 
         if ($child.hasClass('headertext')) {
           const text = $child.trimText()
@@ -76,7 +76,7 @@ const blocks: NewsContent['body']['blocks'] = []
             })
           }
         }
-        else if ($child.hasClass('image-con')) {   // ← 改成 $child
+        else if ($child.hasClass('image-con')) {
           const imgSrc = $child.find('img').attr('src')
           if (imgSrc) {
             blocks.push({
@@ -94,7 +94,7 @@ const blocks: NewsContent['body']['blocks'] = []
             })
           }
         }
-        // 其他子元素忽略
+        // ignore other direct children (like read-more <a>, etc.)
       })
     }
 
