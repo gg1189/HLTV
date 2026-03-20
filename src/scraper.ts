@@ -42,7 +42,7 @@ export const getNewsContent =
       ? new Date(dateUnix * 1000).toISOString()
       : new Date().toISOString()
 
-    // 主圖（保留）
+    // 主圖（保留原本邏輯，可選）
     let image_url: string | undefined
     const srcset = $('.image-con picture source').attr('srcset')
     if (srcset) {
@@ -58,7 +58,7 @@ export const getNewsContent =
       eventId = match ? Number(match[1]) : undefined
     }
 
-    // ── 提取 blocks ──
+    // ── 提取 blocks ── 按原始順序
     const blocks: NewsContent['body']['blocks'] = []
 
     const contentContainer = $('.newsdsl .newstext-con').first()
@@ -67,6 +67,7 @@ export const getNewsContent =
       contentContainer.children().each((i, child) => {
         const $child = $(child)
 
+        // headertext → header
         if ($child.hasClass('headertext')) {
           const text = $child.trimText()
           if (text) {
@@ -75,7 +76,10 @@ export const getNewsContent =
               data: { text }
             })
           }
-        } else if ($child.hasClass('image-con')) {
+        }
+
+        // image-con → image (只取 img src)
+        else if ($child.hasClass('image-con')) {
           const imgSrc = $child.find('img').attr('src')
           if (imgSrc) {
             blocks.push({
@@ -83,7 +87,10 @@ export const getNewsContent =
               data: { url: imgSrc }
             })
           }
-        } else if ($child.hasClass('news-block')) {
+        }
+
+        // news-block → paragraph
+        else if ($child.hasClass('news-block')) {
           const text = $child.trimText()
           if (text) {
             blocks.push({
@@ -92,7 +99,8 @@ export const getNewsContent =
             })
           }
         }
-        // 其他元素（如 read-more <a>）自動忽略
+
+        // 其他子元素忽略（例如 <a class="news-read-more-1"> 之類的 read more 區塊）
       })
     }
 
