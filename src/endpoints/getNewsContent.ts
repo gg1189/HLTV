@@ -59,30 +59,34 @@ export const getNewsContent =
     }
 
     // ── 提取 blocks ──
-    const blocks: NewsContent['body']['blocks'] = []
+const blocks: NewsContent['body']['blocks'] = []
 
     const contentContainer = $('.newsdsl .newstext-con').first()
 
     if (contentContainer.exists()) {
       contentContainer.children().each((i, child) => {
+        const $child = $(child)   // 這行非常重要！
 
-        if (child.hasClass('headertext')) {
-
+        if ($child.hasClass('headertext')) {
+          const text = $child.trimText()
+          if (text) {
             blocks.push({
               type: 'header',
               data: { text }
             })
           }
-        } else if (child.hasClass('image-con')) {
-          const imgSrc = child.find('img').attr('src')
+        }
+        else if ($child.hasClass('image-con')) {   // ← 改成 $child
+          const imgSrc = $child.find('img').attr('src')
           if (imgSrc) {
             blocks.push({
               type: 'image',
               data: { url: imgSrc }
             })
           }
-        } else if (child.hasClass('news-block')) {
-          const text = child.trimText()
+        }
+        else if ($child.hasClass('news-block')) {
+          const text = $child.trimText()
           if (text) {
             blocks.push({
               type: 'paragraph',
@@ -90,7 +94,7 @@ export const getNewsContent =
             })
           }
         }
-        // 其他元素（如 read-more <a>）自動忽略
+        // 其他子元素忽略
       })
     }
 
