@@ -67,9 +67,7 @@ export const getNewsContent =
               data: { url: relevantChildren }
             })
           }
-        }
-      })
-    }
+
 
     return {
       id,
