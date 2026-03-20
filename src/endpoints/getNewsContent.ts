@@ -42,7 +42,7 @@ export const getNewsContent =
       ? new Date(dateUnix * 1000).toISOString()
       : new Date().toISOString()
 
-    // 主圖（保留原本邏輯）
+    // 主圖（保留）
     let image_url: string | undefined
     const srcset = $('.image-con picture source').attr('srcset')
     if (srcset) {
@@ -64,37 +64,34 @@ export const getNewsContent =
     const contentContainer = $('.newsdsl .newstext-con').first()
 
     if (contentContainer.exists()) {
-      // headertext → header
-      contentContainer.children('.headertext').each((i, el) => {
-        const text = el.trimText()
-        if (text) {
-          blocks.push({
-            type: 'header',
-            data: { text }
-          })
-        }
-      })
+      contentContainer.children().each((i, child) => {
 
-      // image-con → image (只取 img src)
-      contentContainer.children('.image-con').each((i, el) => {
-        const imgSrc = el.find('img').attr('src')
-        if (imgSrc) {
-          blocks.push({
-            type: 'image',
-            data: { url: imgSrc }
-          })
+        if (child.hasClass('headertext')) {
+          const text = child.trimText()
+          if (text) {
+            blocks.push({
+              type: 'header',
+              data: { text }
+            })
+          }
+        } else if (child.hasClass('image-con')) {
+          const imgSrc = child.find('img').attr('src')
+          if (imgSrc) {
+            blocks.push({
+              type: 'image',
+              data: { url: imgSrc }
+            })
+          }
+        } else if (child.hasClass('news-block')) {
+          const text = child.trimText()
+          if (text) {
+            blocks.push({
+              type: 'paragraph',
+              data: { text }
+            })
+          }
         }
-      })
-
-      // news-block → paragraph
-      contentContainer.children('.news-block').each((i, el) => {
-        const text = el.trimText()
-        if (text) {
-          blocks.push({
-            type: 'paragraph',
-            data: { text }
-          })
-        }
+        // 其他元素（如 read-more <a>）自動忽略
       })
     }
 
