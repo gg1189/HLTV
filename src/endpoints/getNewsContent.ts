@@ -60,7 +60,7 @@ export const getNewsContent =
 
     if (contentContainer.exists()) {
       // 抓所有相關的直接子元素（p.headertext, p.news-block, div.image-con）
-      const relevantChildren = contentContainer.children('p.headertext, p.news-block, div.image-con').toArray()
+      const relevantChildren = contentContainer.children().toArray()
 
       relevantChildren.forEach((el) => {
         const className = el.attr('class') || ''
