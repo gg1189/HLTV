@@ -9,14 +9,13 @@ export interface NewsContent {
   author: string
   body: {
     blocks: Array<{
-      type: 'paragraph' | 'header' | 'image'
+      type: 'paragraph' | 'header'
       data: {
-        text?: string
-        url?: string
+        text: string
       }
     }>
   }
-  image_url?: string              // 保持原有（文章封面圖，可選）
+  image_url?: string
   event?: {
     name: string
     id?: number
@@ -36,13 +35,13 @@ export const getNewsContent =
     // Author
     const author = $('.author-date-con .author a').trimText() || 'Unknown author'
 
-    // Date
+    // Date (data-unix 通常是秒級 timestamp)
     const dateUnix = $('.date').numFromAttr('data-unix')
     const date = dateUnix
       ? new Date(dateUnix * 1000).toISOString()
-      : new Date().toISOString()
+      : new Date().toISOString() // fallback to current time
 
-    // 文章封面圖（原有邏輯，保持不變）
+    // Image
     let image_url: string | undefined
     const srcset = $('.image-con picture source').attr('srcset')
     if (srcset) {
@@ -64,43 +63,41 @@ export const getNewsContent =
     const contentContainer = $('.newsdsl .newstext-con').first()
 
     if (contentContainer.exists()) {
-      contentContainer.children().each((i, child) => {
-        const $child = $(child)  // 使用你的 wrapper 包裝
-
-        // .headertext → header
-        if ($child.hasClass('headertext')) {
-          const text = $child.trimText()
-          if (text) {
-            blocks.push({
-              type: 'header',
-              data: { text }
-            })
-          }
+      // .headertext → header block
+      contentContainer.children('.headertext').each((i, el) => {
+        const text = el.trimText()
+        if (text) {
+          blocks.push({
+            type: 'header',
+            data: { text }
+          })
         }
+      })
 
-        // .news-block → paragraph
-        else if ($child.hasClass('news-block')) {
-          const text = $child.trimText()
-          if (text) {
-            blocks.push({
-              type: 'paragraph',
-              data: { text }
-            })
-          }
-        }
-
-        // .image-con → image block，只取 <img> 的 src
-        else if ($child.hasClass('image-con')) {
-          const imgSrc = $child.find('img').attr('src')
+      // .headertext → header block
+      contentContainer.children('.image-con').each((i, el) => {
+      const imgSrc = $child.find('img').attr('src')
           if (imgSrc) {
             blocks.push({
               type: 'image',
               data: { url: imgSrc }
             })
-          }
+        }
+      })
+
+      // .news-block → paragraph block
+      contentContainer.children('.news-block').each((i, el) => {
+        const text = el.trimText()
+        if (text) {
+          blocks.push({
+            type: 'paragraph',
+            data: { text }
+          })
         }
       })
     }
+
+    // 如果沒有任何 block，blocks 會保持為空陣列
 
     return {
       id,
