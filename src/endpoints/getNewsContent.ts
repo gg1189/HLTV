@@ -30,26 +30,20 @@ export const getNewsContent =
     const html = await fetchPage(url, config.loadPage)
     const $ = HLTVScraper(html)
 
-    // Title
     const title = $('h1.headline').trimText() || 'No title'
-
-    // Author
     const author = $('.author-date-con .author a').trimText() || 'Unknown author'
 
-    // Date
     const dateUnix = $('.date').numFromAttr('data-unix')
     const date = dateUnix
       ? new Date(dateUnix * 1000).toISOString()
       : new Date().toISOString()
 
-    // 主圖（保留原本邏輯）
     let image_url: string | undefined
     const srcset = $('.image-con picture source').attr('srcset')
     if (srcset) {
       image_url = srcset.split(',')[0]?.trim().split(' ')[0]
     }
 
-    // Event
     const eventName = $('.event a').trimText()
     const eventHref = $('.event a').attr('href')
     let eventId: number | undefined
@@ -58,15 +52,13 @@ export const getNewsContent =
       eventId = match ? Number(match[1]) : undefined
     }
 
-    // ── 提取 blocks ──
     const blocks: NewsContent['body']['blocks'] = []
 
     const contentContainer = $('.newsdsl .newstext-con').first()
 
     if (contentContainer.exists()) {
-      // 按原始 DOM 順序遍歷所有直接子元素
       contentContainer.children().each((i, el) => {
-        // el 已經是 HLTVPageElement，直接使用
+        // el 就是 HLTVPageElement，可以直接用 .hasClass()、.trimText()、.find() 等
 
         if (el.hasClass('headertext')) {
           const text = el.trimText()
@@ -78,8 +70,7 @@ export const getNewsContent =
           }
         }
         else if (el.hasClass('image-con')) {
-          // 取第一個 img 的 src
-          const imgSrc = el.find('img').first().attr('src')
+          const imgSrc = el.find('img').attr('src')
           if (imgSrc) {
             blocks.push({
               type: 'image',
@@ -96,7 +87,6 @@ export const getNewsContent =
             })
           }
         }
-        // 其他子元素（如 read-more 區塊）會被忽略
       })
     }
 
