@@ -62,38 +62,9 @@ export const getNewsContent =
       // 抓所有相關的直接子元素（p.headertext, p.news-block, div.image-con）
       const relevantChildren = contentContainer.children().toArray()
 
-      relevantChildren.forEach((el) => {
-        const className = el.attr('class') || ''
-
-        if (className.includes('headertext')) {
-          const text = el.trimText()
-          if (text) {
-            blocks.push({
-              type: 'header',
-              data: { text }
-            })
-          }
-        } else if (className.includes('news-block')) {
-          const text = el.trimText()
-          if (text) {
-            blocks.push({
-              type: 'paragraph',
-              data: { text }
-            })
-          }
-        } else if (className.includes('image-con')) {
-          // 從 picture source 或 img 抓圖片 URL
-          let imgUrl = el.find('picture source').attr('srcset')?.split(',')[0]?.trim().split(' ')[0]
-
-          // fallback 到 img src
-          if (!imgUrl) {
-            imgUrl = el.find('img').attr('src')
-          }
-
-          if (imgUrl) {
             blocks.push({
               type: 'image',
-              data: { url: imgUrl }
+              data: { url: relevantChildren }
             })
           }
         }
