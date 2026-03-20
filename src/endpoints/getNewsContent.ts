@@ -68,14 +68,15 @@ export const getNewsContent =
       contentContainer.children().each((i, el) => {
         // el 已經是 HLTVPageElement，直接使用
 
-
-
+        if (el.hasClass('headertext')) {
+          const text = el.trimText()
+          if (text) {
             blocks.push({
-              type: 'test',
-              data: { 'test' }
+              type: 'header',
+              data: { text }
             })
-
-
+          }
+        }
         else if (el.hasClass('image-con')) {
           // 取第一個 img 的 src
           const imgSrc = el.find('img').first().attr('src')
