@@ -66,9 +66,9 @@ export const getNewsContent =
     if (contentContainer.exists()) {
       // 按原始 DOM 順序遍歷所有直接子元素
       contentContainer.children().each((i, el) => {
-        const $el = $(el)  // 包裝成 HLTVPageElement 才能用 trimText() 等方法
+        const test2 = $(el)  // 包裝成 HLTVPageElement 才能用 trimText() 等方法
 
-        if ($el.hasClass('headertext')) {
+        if (test2.hasClass('headertext')) {
           const text = el.trimText()
           if (text) {
             blocks.push({
@@ -77,8 +77,8 @@ export const getNewsContent =
             })
           }
         }
-        else if ($el.hasClass('image-con')) {
-          const imgSrc = $el.find('img').attr('src')
+        else if (test2.hasClass('image-con')) {
+          const imgSrc = test2.find('img').attr('src')
           if (imgSrc) {
             blocks.push({
               type: 'image',
@@ -86,7 +86,7 @@ export const getNewsContent =
             })
           }
         }
-        else if ($el.hasClass('news-block')) {
+        else if (test2.hasClass('news-block')) {
           const text = el.trimText()
           if (text) {
             blocks.push({
