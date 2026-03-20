@@ -11,12 +11,12 @@ export interface NewsContent {
     blocks: Array<{
       type: 'paragraph' | 'header' | 'image'
       data: {
-        text?: string
-        url?: string              // 只在 type: 'image' 時存在
+        text?: string          // for paragraph/header
+        url?: string           // for image
       }
     }>
   }
-  image_url?: string              // 保留原有欄位（可選，作為主要封面圖）
+  image_url?: string             // 原有的主要圖片（可選保留）
   event?: {
     name: string
     id?: number
@@ -36,13 +36,13 @@ export const getNewsContent =
     // Author
     const author = $('.author-date-con .author a').trimText() || 'Unknown author'
 
-    // Date
+    // Date (data-unix 通常是秒級 timestamp)
     const dateUnix = $('.date').numFromAttr('data-unix')
     const date = dateUnix
       ? new Date(dateUnix * 1000).toISOString()
-      : new Date().toISOString()
+      : new Date().toISOString() // fallback
 
-    // 主要封面圖（原有邏輯，保留作為獨立欄位）
+    // 原有主要圖片（可選保留，如果你之後還想用）
     let image_url: string | undefined
     const srcset = $('.image-con picture source').attr('srcset')
     if (srcset) {
@@ -64,11 +64,11 @@ export const getNewsContent =
     const contentContainer = $('.newsdsl .newstext-con').first()
 
     if (contentContainer.exists()) {
-      // 按順序處理所有直接子元素
+      // 遍歷所有直接子元素，按順序處理
       contentContainer.children().each((i, child) => {
-        const $child = $(child)
+        const $child = $(child)  // 用 wrapper 包裝
 
-        // headertext → header
+        // 處理 .headertext
         if ($child.hasClass('headertext')) {
           const text = $child.trimText()
           if (text) {
@@ -79,7 +79,18 @@ export const getNewsContent =
           }
         }
 
-        // news-block → paragraph
+        // 處理 .image-con → 取出 <img src>
+        else if ($child.hasClass('image-con')) {
+          const imgSrc = $child.find('img').attr('src')
+          if (imgSrc) {
+            blocks.push({
+              type: 'image',
+              data: { url: imgSrc }
+            })
+          }
+        }
+
+        // 處理 .news-block
         else if ($child.hasClass('news-block')) {
           const text = $child.trimText()
           if (text) {
@@ -90,16 +101,7 @@ export const getNewsContent =
           }
         }
 
-        // image-con → image block (只取 img src)
-        else if ($child.hasClass('image-con')) {
-          const imgSrc = $child.find('img').attr('src')
-          if (imgSrc) {
-            blocks.push({
-              type: 'image',
-              data: { url: imgSrc }
-            })
-          }
-        }
+        // 忽略其他子元素（如 <a class="news-read-more-1"> 等）
       })
     }
 
@@ -111,7 +113,7 @@ export const getNewsContent =
       body: {
         blocks
       },
-      image_url,
+      image_url,  // 可選保留，如果你前端還需要單獨處理主要圖片
       event: eventName ? { name: eventName, id: eventId } : undefined
     }
   }
