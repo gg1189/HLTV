@@ -35,7 +35,7 @@ export interface HLTVPageElement {
   filter(
     func: (index: number, element: HLTVPageElement) => boolean
   ): HLTVPageElement
-  hasClass(className: string): HLTVPageElement
+  hasClass(className: string): boolean
 }
 
 const attachMethods = (root: cheerio.Cheerio): HLTVPageElement => {
