@@ -76,7 +76,7 @@ export const getNewsContent =
 
       // .headertext → header block
       contentContainer.children('.image-con').each((i, el) => {
-      const imgSrc = $child.find('img').attr('src')
+      const imgSrc = el.find('img').attr('src')
           if (imgSrc) {
             blocks.push({
               type: 'image',
