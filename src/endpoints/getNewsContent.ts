@@ -32,7 +32,7 @@ export const getNewsContent =
 
     const title = $('h1.headline').text().trim() || '無標題'
 
-    const author = $('.author-date-con .author a').text().trim() || '未知作者'
+    const author = $('.author-date-con .author a').attr('textContent')?.trim() || '未知作者'
 
     const dateText = $('.date').attr('data-unix')
     const date = dateText ? new Date(Number(dateText)).toISOString() : ''
@@ -43,11 +43,11 @@ export const getNewsContent =
     const eventHref = $('.event a').attr('href')
     const eventId = eventHref ? Number(eventHref.match(/\/events\/(\d+)/)?.[1]) : undefined
 
-    // 從 .newstext-con 裡動態生成 blocks
+    // 動態生成 blocks，從 .newstext-con 的子元素
     const blocks: NewsContent['body']['blocks'] = []
 
-    $('.newstext-con').children().each((index, child) => {
-      const tag = child.prop('tagName').toLowerCase()
+    $('.newstext-con').children().each((_, child) => {
+      const tag = child.attr('tagName')?.toLowerCase() || ''
       const className = child.attr('class') || ''
 
       let block: NewsContent['body']['blocks'][number] = {
@@ -83,14 +83,13 @@ export const getNewsContent =
           type: 'read-more'
         }
       } else if (child.text().trim()) {
-        // 其他有文字的元素
         block = {
           data: { text: child.text().trim() },
           type: 'other'
         }
       }
 
-      if (block.data.text || block.data.image_url || block.data.link) {
+      if (Object.keys(block.data).length > 0) {
         blocks.push(block)
       }
     })
