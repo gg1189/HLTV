@@ -64,9 +64,8 @@ export const getNewsContent =
     if (contentContainer.exists()) {
       // Iterate over all direct children to preserve exact order
       contentContainer.children().each((i, child) => {
-        const child = $(child)
-        const text = child.trimText()
 
+        const text = child.trimText()
         const classAttr = child.attr('class') || ''
 
         if (classAttr.includes('headertext') && text) {
