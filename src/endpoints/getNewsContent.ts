@@ -4,19 +4,21 @@ import { fetchPage, generateRandomSuffix } from '../utils'
 
 export interface NewsContent {
   id: string | number
-  date: string
+  date: string                    // ISO 格式，例如 "2026-03-19T08:38:00.000Z"
   title: string
   author: string
   body: {
     blocks: Array<{
-      type: 'paragraph' | 'header' | 'image'
       data: {
-        text?: string          // for paragraph/header
-        url?: string           // for image
+        text?: string
+        image_url?: string
+        link?: string
+        title?: string
       }
+      type: 'paragraph' | 'header' | 'image' | 'read-more' | 'other'
     }>
   }
-  image_url?: string           // 保留原主圖（可選，如果有頭圖）
+  image_url?: string
   event?: {
     name: string
     id?: number
@@ -24,60 +26,82 @@ export interface NewsContent {
 }
 
 export const getNewsContent =
-  (config: HLTVConfig) =>
-  async ({ id }: { id: number | string }): Promise<NewsContent> => {
+  (config: HLTVConfig) => async ({ id }: { id: number | string }): Promise<NewsContent> => {
     const url = `https://www.hltv.org/news/${id}/${generateRandomSuffix()}`
-    const html = await fetchPage(url, config.loadPage)
-    const $ = HLTVScraper(html)
+    const $ = HLTVScraper(await fetchPage(url, config.loadPage))
 
-    const title = $('h1.headline').trimText() || 'No title'
-    const author = $('.author-date-con .author a').trimText() || 'Unknown author'
+    const title = $('h1.headline').text().trim() || '無標題'
 
-    const dateUnix = $('.date').numFromAttr('data-unix')
-    const date = dateUnix
-      ? new Date(dateUnix * 1000).toISOString()
-      : new Date().toISOString()
+    const author = $('.author-date-con .author a').text().trim() || '未知作者'
 
-    // 主圖（如果新聞有頭圖，可保留）
-    let image_url: string | undefined
-    const srcset = $('.image-con picture source').attr('srcset')
-    if (srcset) {
-      image_url = srcset.split(',')[0]?.trim().split(' ')[0]
-    }
+    const dateText = $('.date').attr('data-unix')
+    const date = dateText ? new Date(Number(dateText)).toISOString() : ''
 
-    const eventName = $('.event a').trimText()
+    const image_url = $('.image-con picture source').attr('srcset')?.split(' ')[0] || undefined
+
+    const eventName = $('.event a').text().trim()
     const eventHref = $('.event a').attr('href')
-    let eventId: number | undefined
-    if (eventHref) {
-      const match = eventHref.match(/\/events\/(\d+)/)
-      eventId = match ? Number(match[1]) : undefined
-    }
+    const eventId = eventHref ? Number(eventHref.match(/\/events\/(\d+)/)?.[1]) : undefined
 
-    // ── 提取 blocks，按原始順序 ──
+    // 從 .newstext-con 裡動態生成 blocks
     const blocks: NewsContent['body']['blocks'] = []
 
-    const contentContainer = $('.newsdsl .newstext-con').first()
+    $('.newstext-con').children().each((index, child) => {
+      const tag = child.prop('tagName').toLowerCase()
+      const className = child.attr('class') || ''
 
-    if (contentContainer.exists()) {
-      // 抓所有相關的直接子元素（p.headertext, p.news-block, div.image-con）
-      const relevantChildren = contentContainer.children().toArray()
+      let block: NewsContent['body']['blocks'][number] = {
+        data: {},
+        type: 'other'
+      }
 
-            blocks.push({
-              type: 'image',
-              data: { url: relevantChildren }
-            })
-          }
+      if (tag === 'p') {
+        block = {
+          data: { text: child.text().trim() },
+          type: 'paragraph'
+        }
+      } else if (tag.match(/^h[1-6]$/)) {
+        block = {
+          data: { text: child.text().trim() },
+          type: 'header'
+        }
+      } else if (className.includes('image-con')) {
+        const imgSrc = child.find('img').attr('src') || child.find('source').attr('srcset')?.split(' ')[0]
+        block = {
+          data: { image_url: imgSrc },
+          type: 'image'
+        }
+      } else if (className.includes('news-read-more-1')) {
+        const readMoreTitle = child.find('.news-read-more-1-bottom').text().trim()
+        const readMoreLink = child.attr('href')
+        block = {
+          data: {
+            text: child.find('.news-read-more-1-top').text().trim() || 'Read more',
+            title: readMoreTitle,
+            link: readMoreLink
+          },
+          type: 'read-more'
+        }
+      } else if (child.text().trim()) {
+        // 其他有文字的元素
+        block = {
+          data: { text: child.text().trim() },
+          type: 'other'
+        }
+      }
 
+      if (block.data.text || block.data.image_url || block.data.link) {
+        blocks.push(block)
+      }
+    })
 
     return {
       id,
       date,
       title,
       author,
-      body: {
-        blocks
-      },
-      image_url,  // 如果有頭圖，可保留；或設為 undefined
+      body: { blocks },
+      image_url,
       event: eventName ? { name: eventName, id: eventId } : undefined
     }
   }
