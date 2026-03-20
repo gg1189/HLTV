@@ -4,7 +4,7 @@ import { fetchPage, generateRandomSuffix } from '../utils'
 
 export interface NewsContent {
   id: string | number
-  date: string                    // ISO format, e.g. "2025-03-19T08:38:00.000Z"
+  date: string                    // ISO format, e.g. "2026-03-19T08:38:00.000Z"
   title: string
   author: string
   body: {
@@ -62,23 +62,26 @@ export const getNewsContent =
     const contentContainer = $('.newsdsl .newstext-con').first()
 
     if (contentContainer.exists()) {
-      // Iterate over **all direct children** to preserve exact order
+      // Iterate over all direct children to preserve exact order
       contentContainer.children().each((i, child) => {
+        const child = $(child)
         const text = child.trimText()
 
-        if (child.hasClass('headertext') && text) {
+        const classAttr = child.attr('class') || ''
+
+        if (classAttr.includes('headertext') && text) {
           blocks.push({
             type: 'header',
             data: { text }
           })
         }
-        else if (child.hasClass('news-block') && text) {
+        else if (classAttr.includes('news-block') && text) {
           blocks.push({
             type: 'paragraph',
             data: { text }
           })
         }
-        else if (child.hasClass('image-con')) {
+        else if (classAttr.includes('image-con')) {
           // Extract best available image URL
           let imgUrl =
             child.find('img').attr('src') ||
@@ -94,7 +97,7 @@ export const getNewsContent =
             })
           }
         }
-        // You can ignore <a class="news-read-more-1"> or handle it separately if needed
+        // <a class="news-read-more-1"> will be skipped automatically
       })
     }
 
