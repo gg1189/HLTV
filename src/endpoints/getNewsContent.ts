@@ -4,18 +4,15 @@ import { fetchPage, generateRandomSuffix } from '../utils'
 
 export interface NewsContent {
   id: string | number
-  date: string                    // ISO 格式，例如 "2026-03-19T08:38:00.000Z"
+  date: string
   title: string
   author: string
   body: {
     blocks: Array<{
+      type: 'paragraph' | 'header'
       data: {
-        text?: string
-        image_url?: string
-        link?: string
-        title?: string
+        text: string
       }
-      type: 'paragraph' | 'header' | 'image' | 'read-more' | 'other'
     }>
   }
   image_url?: string
@@ -26,80 +23,69 @@ export interface NewsContent {
 }
 
 export const getNewsContent =
-  (config: HLTVConfig) => async ({ id }: { id: number | string }): Promise<NewsContent> => {
+  (config: HLTVConfig) =>
+  async ({ id }: { id: number | string }): Promise<NewsContent> => {
     const url = `https://www.hltv.org/news/${id}/${generateRandomSuffix()}`
-    const $ = HLTVScraper(await fetchPage(url, config.loadPage))
+    const html = await fetchPage(url, config.loadPage)
+    const $ = HLTVScraper(html)
 
-    const title = $('h1.headline').text().trim() || '無標題'
+    const title = $('h1.headline').trimText() || 'No title'
+    const author = $('.author-date-con .author a').trimText() || 'Unknown author'
 
-    const author = $('.author-date-con .author a').attr('textContent')?.trim() || '未知作者'
+    const dateUnix = $('.date').numFromAttr('data-unix')
+    const date = dateUnix
+      ? new Date(dateUnix * 1000).toISOString()
+      : new Date().toISOString()
 
-    const dateText = $('.date').attr('data-unix')
-    const date = dateText ? new Date(Number(dateText)).toISOString() : ''
+    let image_url: string | undefined
+    const srcset = $('.image-con picture source').attr('srcset')
+    if (srcset) {
+      image_url = srcset.split(',')[0]?.trim().split(' ')[0]
+    }
 
-    const image_url = $('.image-con picture source').attr('srcset')?.split(' ')[0] || undefined
-
-    const eventName = $('.event a').text().trim()
+    const eventName = $('.event a').trimText()
     const eventHref = $('.event a').attr('href')
-    const eventId = eventHref ? Number(eventHref.match(/\/events\/(\d+)/)?.[1]) : undefined
+    let eventId: number | undefined
+    if (eventHref) {
+      const match = eventHref.match(/\/events\/(\d+)/)
+      eventId = match ? Number(match[1]) : undefined
+    }
 
-    // 動態生成 blocks，從 .newstext-con 的子元素
+    // ── 提取 blocks，按頁面順序 push ──
     const blocks: NewsContent['body']['blocks'] = []
 
-    $('.newstext-con').children().each((_, child) => {
-      const tag = child.attr('tagName')?.toLowerCase() || ''
-      const className = child.attr('class') || ''
+    const contentContainer = $('.newsdsl .newstext-con').first()
 
-      let block: NewsContent['body']['blocks'][number] = {
-        data: {},
-        type: 'other'
-      }
+    if (contentContainer.exists()) {
+      contentContainer.children().each((i, el) => {
+        const text = el.trimText()
+        if (!text) return
 
-      if (tag === 'p') {
-        block = {
-          data: { text: child.text().trim() },
-          type: 'paragraph'
-        }
-      } else if (tag.match(/^h[1-6]$/)) {
-        block = {
-          data: { text: child.text().trim() },
-          type: 'header'
-        }
-      } else if (className.includes('image-con')) {
-        const imgSrc = child.find('img').attr('src') || child.find('source').attr('srcset')?.split(' ')[0]
-        block = {
-          data: { image_url: imgSrc },
-          type: 'image'
-        }
-      } else if (className.includes('news-read-more-1')) {
-        const readMoreTitle = child.find('.news-read-more-1-bottom').text().trim()
-        const readMoreLink = child.attr('href')
-        block = {
-          data: {
-            text: child.find('.news-read-more-1-top').text().trim() || 'Read more',
-            title: readMoreTitle,
-            link: readMoreLink
-          },
-          type: 'read-more'
-        }
-      } else if (child.text().trim()) {
-        block = {
-          data: { text: child.text().trim() },
-          type: 'other'
-        }
-      }
+        const className = el.attr('class') || ''
 
-      if (Object.keys(block.data).length > 0) {
-        blocks.push(block)
-      }
-    })
+        if (className.includes('headertext')) {
+          blocks.push({
+            type: 'header',
+            data: { text }
+          })
+        } else if (className.includes('news-block')) {
+          blocks.push({
+            type: 'paragraph',
+            data: { text }
+          })
+        }
+        // 其他 class 直接忽略，不 push
+      })
+    }
 
     return {
       id,
       date,
       title,
       author,
-      body: { blocks },
+      body: {
+        blocks
+      },
       image_url,
       event: eventName ? { name: eventName, id: eventId } : undefined
     }
