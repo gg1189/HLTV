@@ -9,13 +9,14 @@ export interface NewsContent {
   author: string
   body: {
     blocks: Array<{
-      type: 'paragraph' | 'header'
+      type: 'paragraph' | 'header' | 'image'
       data: {
-        text: string
+        text?: string
+        url?: string
       }
     }>
   }
-  image_url?: string
+  image_url?: string              // 保留原本的主圖（optional）
   event?: {
     name: string
     id?: number
@@ -41,7 +42,7 @@ export const getNewsContent =
       ? new Date(dateUnix * 1000).toISOString()
       : new Date().toISOString() // fallback to current time
 
-    // Image
+    // 主圖（原本邏輯，保留作為後備）
     let image_url: string | undefined
     const srcset = $('.image-con picture source').attr('srcset')
     if (srcset) {
@@ -63,30 +64,44 @@ export const getNewsContent =
     const contentContainer = $('.newsdsl .newstext-con').first()
 
     if (contentContainer.exists()) {
-      // .headertext → header block
-      contentContainer.children('.headertext').each((i, el) => {
-        const text = el.trimText()
-        if (text) {
-          blocks.push({
-            type: 'header',
-            data: { text }
-          })
-        }
-      })
+      // 遍歷所有直接子元素，按順序處理
+      contentContainer.children().each((i, child) => {
+        const $child = $(child)
 
-      // .news-block → paragraph block
-      contentContainer.children('.news-block').each((i, el) => {
-        const text = el.trimText()
-        if (text) {
-          blocks.push({
-            type: 'paragraph',
-            data: { text }
-          })
+        // .headertext → header
+        if ($child.hasClass('headertext')) {
+          const text = $child.trimText()
+          if (text) {
+            blocks.push({
+              type: 'header',
+              data: { text }
+            })
+          }
+        }
+
+        // .news-block → paragraph
+        else if ($child.hasClass('news-block')) {
+          const text = $child.trimText()
+          if (text) {
+            blocks.push({
+              type: 'paragraph',
+              data: { text }
+            })
+          }
+        }
+
+        // .image-con → image block，只取 <img> 的 src
+        else if ($child.hasClass('image-con')) {
+          const imgSrc = $child.find('img').attr('src')
+          if (imgSrc) {
+            blocks.push({
+              type: 'image',
+              data: { url: imgSrc }
+            })
+          }
         }
       })
     }
-
-    // 如果沒有任何 block，blocks 會保持為空陣列
 
     return {
       id,
