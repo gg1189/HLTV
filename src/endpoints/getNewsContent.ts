@@ -36,13 +36,13 @@ export const getNewsContent =
     // Author
     const author = $('.author-date-con .author a').trimText() || 'Unknown author'
 
-    // Date (data-unix is usually seconds → ×1000 for ms)
+    // Date
     const dateUnix = $('.date').numFromAttr('data-unix')
     const date = dateUnix
       ? new Date(dateUnix * 1000).toISOString()
-      : new Date().toISOString() // fallback to now
+      : new Date().toISOString()
 
-    // Main featured image (optional fallback)
+    // 主圖（保留原本邏輯）
     let image_url: string | undefined
     const srcset = $('.image-con picture source').attr('srcset')
     if (srcset) {
@@ -58,43 +58,43 @@ export const getNewsContent =
       eventId = match ? Number(match[1]) : undefined
     }
 
-    // ── Extract blocks in original DOM order ──
+    // ── 提取 blocks ──
     const blocks: NewsContent['body']['blocks'] = []
 
     const contentContainer = $('.newsdsl .newstext-con').first()
 
     if (contentContainer.exists()) {
-      contentContainer.children().each((i, child) => {
+      // headertext → header
+      contentContainer.children('.headertext').each((i, el) => {
+        const text = $(el).trimText()
+        if (text) {
+          blocks.push({
+            type: 'header',
+            data: { text }
+          })
+        }
+      })
 
+      // image-con → image (只取 img src)
+      contentContainer.children('.image-con').each((i, el) => {
+        const imgSrc = $(el).find('img').attr('src')
+        if (imgSrc) {
+          blocks.push({
+            type: 'image',
+            data: { url: imgSrc }
+          })
+        }
+      })
 
-        if (child.hasClass('headertext')) {
-          const text = child.trimText()
-          if (text) {
-            blocks.push({
-              type: 'header',
-              data: { text }
-            })
-          }
+      // news-block → paragraph
+      contentContainer.children('.news-block').each((i, el) => {
+        const text = $(el).trimText()
+        if (text) {
+          blocks.push({
+            type: 'paragraph',
+            data: { text }
+          })
         }
-        else if (child.hasClass('image-con')) {
-          const imgSrc = child.find('img').attr('src')
-          if (imgSrc) {
-            blocks.push({
-              type: 'image',
-              data: { url: imgSrc }
-            })
-          }
-        }
-        else if (child.hasClass('news-block')) {
-          const text = child.trimText()
-          if (text) {
-            blocks.push({
-              type: 'paragraph',
-              data: { text }
-            })
-          }
-        }
-        // ignore other direct children (like read-more <a>, etc.)
       })
     }
 
