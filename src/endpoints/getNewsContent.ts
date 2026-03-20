@@ -24,7 +24,7 @@ export interface NewsContent {
         }
     >
   }
-  image_url?: string              // 可選：保留原本的主要封面圖（如果需要）
+  image_url?: string
   event?: {
     name: string
     id?: number
@@ -45,12 +45,13 @@ export const getNewsContent =
     const author = $('.author-date-con .author a').trimText() || 'Unknown author'
 
     // Date
-    const dateUnix = $('.date').numFromAttr('data-unix')
-    const date = dateUnix
+    const dateUnixRaw = $('.date').attr('data-unix')
+    const dateUnix = dateUnixRaw ? parseInt(dateUnixRaw, 10) : NaN
+    const date = !isNaN(dateUnix) && dateUnix > 0
       ? new Date(dateUnix * 1000).toISOString()
       : new Date().toISOString()
 
-    // 主圖（原本的 image_url，可選保留）
+    // 主圖（封面圖）
     let image_url: string | undefined
     const srcsetMain = $('.image-con picture source').attr('srcset')
     if (srcsetMain) {
@@ -66,65 +67,57 @@ export const getNewsContent =
       eventId = match ? Number(match[1]) : undefined
     }
 
-    // ── 提取 blocks ──（嚴格按原始 HTML 順序）
+    // ── Debug logs ──
+    console.log(`[getNewsContent] News ID: ${id}`)
+    console.log(`[getNewsContent] URL: ${url}`)
+    console.log(`[getNewsContent] Container exists: ${$('.newstext-con').exists()}`)
+    console.log(`[getNewsContent] Found .newsdsl .newstext-con: ${$('.newsdsl .newstext-con').exists()}`)
+    console.log(`[getNewsContent] Number of direct children in .newstext-con: ${$('.newstext-con').children().length}`)
+
+    // 列出所有直接子元素的 class（最重要的 debug 資訊）
+    const childClasses = $('.newstext-con').children().map((i, el) => {
+      const className = $(el).attr('class') || '(no class)'
+      const tag = el.tagName.toLowerCase()
+      return `${tag}.${className}`
+    }).toArray()
+    console.log('[getNewsContent] Direct children classes:', childClasses)
+
+    // 提取 blocks（按原始順序）
     const blocks: NewsContent['body']['blocks'] = []
 
-    const contentContainer = $('.newsdsl .newstext-con').first()
+    const contentContainer = $('.newstext-con').first()  // 改用更寬鬆的選擇器
 
     if (contentContainer.exists()) {
       contentContainer.children().each((i, el) => {
-
+        const el = $(el)
         const className = el.attr('class') || ''
+        const text = el.trimText()
 
-        // headertext → header
         if (className.includes('headertext')) {
-          const text = el.trimText()
           if (text) {
-            blocks.push({
-              type: 'header',
-              data: { text }
-            })
+            blocks.push({ type: 'header', data: { text } })
           }
-        }
-
-        // news-block → paragraph
-        else if (className.includes('news-block')) {
-          const text = el.trimText()
+        } else if (className.includes('news-block')) {
           if (text) {
-            blocks.push({
-              type: 'paragraph',
-              data: { text }
-            })
+            blocks.push({ type: 'paragraph', data: { text } })
           }
-        }
-
-        // image-con → image block
-        else if (className.includes('image-con')) {
-          // 優先取 <source srcset> 的第一個 URL
+        } else if (className.includes('image-con')) {
           let imgUrl = el.find('picture source').attr('srcset')?.split(',')[0]?.trim().split(' ')[0]
-
-          // 如果沒有 source，就取 <img src>
           if (!imgUrl) {
-            imgUrl = el.find('img.image').attr('src')
+            imgUrl = el.find('img').attr('src')
           }
-
-          // 取 alt（如果有）
-          const alt = el.find('img.image').attr('alt') || el.find('img').attr('title') || undefined
-
+          const alt = el.find('img').attr('alt') || el.find('img').attr('title') || undefined
           if (imgUrl) {
             blocks.push({
               type: 'image',
-              data: {
-                url: imgUrl,
-                alt
-              }
+              data: { url: imgUrl, alt }
             })
           }
         }
-
-        // 其他元素（如 .news-read-more-1）目前忽略
       })
     }
+
+    console.log(`[getNewsContent] Generated blocks count: ${blocks.length}`)
 
     return {
       id,
@@ -134,7 +127,7 @@ export const getNewsContent =
       body: {
         blocks
       },
-      image_url,  // 可選保留主圖
+      image_url,
       event: eventName ? { name: eventName, id: eventId } : undefined
     }
   }
