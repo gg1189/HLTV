@@ -66,7 +66,7 @@ export const getNewsContent =
     if (contentContainer.exists()) {
       // headertext → header
       contentContainer.children('.headertext').each((i, el) => {
-        const text = $(el).trimText()
+        const text = el.trimText()
         if (text) {
           blocks.push({
             type: 'header',
@@ -77,7 +77,7 @@ export const getNewsContent =
 
       // image-con → image (只取 img src)
       contentContainer.children('.image-con').each((i, el) => {
-        const imgSrc = $(el).find('img').attr('src')
+        const imgSrc = el.find('img').attr('src')
         if (imgSrc) {
           blocks.push({
             type: 'image',
@@ -88,7 +88,7 @@ export const getNewsContent =
 
       // news-block → paragraph
       contentContainer.children('.news-block').each((i, el) => {
-        const text = $(el).trimText()
+        const text = el.trimText()
         if (text) {
           blocks.push({
             type: 'paragraph',
