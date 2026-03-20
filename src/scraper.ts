@@ -1,165 +1,110 @@
-import * as cheerio from 'cheerio'
-import { parseNumber } from './utils'
+import { HLTVConfig } from '../config'
+import { HLTVScraper } from '../scraper'
+import { fetchPage, generateRandomSuffix } from '../utils'
 
-export interface HLTVPage extends cheerio.Root {
-  (selector: string): HLTVPageElement
+export interface NewsContent {
+  id: string | number
+  date: string                    // ISO format, e.g. "2026-03-19T08:38:00.000Z"
+  title: string
+  author: string
+  body: {
+    blocks: Array<{
+      type: 'paragraph' | 'header' | 'image'
+      data: {
+        text?: string
+        url?: string
+      }
+    }>
+  }
+  image_url?: string
+  event?: {
+    name: string
+    id?: number
+  }
 }
 
-export interface HLTVPageElement {
-  length: number
+export const getNewsContent =
+  (config: HLTVConfig) =>
+  async ({ id }: { id: number | string }): Promise<NewsContent> => {
+    const url = `https://www.hltv.org/news/${id}/${generateRandomSuffix()}`
+    const html = await fetchPage(url, config.loadPage)
+    const $ = HLTVScraper(html)
 
-  trimText(): string | undefined
-  numFromAttr(attr: string): number | undefined
-  numFromText(): number | undefined
-  lines(): string[]
-  exists(): boolean
-  find(selector: string): HLTVPageElement
-  attr(attr: string): string
-  text(): string
-  html(): string
-  textThen<T>(then: (value: string) => T): T
-  first(): HLTVPageElement
-  second(): HLTVPageElement
-  last(): HLTVPageElement
-  toArray(): HLTVPageElement[]
-  each(func: (index: number, element: HLTVPageElement) => void): HLTVPageElement
-  data(name: string): any
-  attrThen<T>(attr: string, then: (value: string) => T): T
-  next(selector?: string): HLTVPageElement
-  eq(index: number): HLTVPageElement
-  parent(): HLTVPageElement
-  children(selector?: string): HLTVPageElement
-  prev(selector?: string): HLTVPageElement
-  contents(): HLTVPageElement
-  index(): number
-  filter(
-    func: (index: number, element: HLTVPageElement) => boolean
-  ): HLTVPageElement
-  hasClass(className: string): boolean
-}
+    // Title
+    const title = $('h1.headline').trimText() || 'No title'
 
-const attachMethods = (root: cheerio.Cheerio): HLTVPageElement => {
-  return {
-    length: root.length,
+    // Author
+    const author = $('.author-date-con .author a').trimText() || 'Unknown author'
 
-    find(selector: string): HLTVPageElement {
-      return attachMethods(root.find(selector))
-    },
+    // Date
+    const dateUnix = $('.date').numFromAttr('data-unix')
+    const date = dateUnix
+      ? new Date(dateUnix * 1000).toISOString()
+      : new Date().toISOString()
 
-    attr(attr: string): string {
-      return root.attr(attr)!
-    },
+    // 主圖（保留）
+    let image_url: string | undefined
+    const srcset = $('.image-con picture source').attr('srcset')
+    if (srcset) {
+      image_url = srcset.split(',')[0]?.trim().split(' ')[0]
+    }
 
-    attrThen<T>(attr: string, then: (value: string) => T): T {
-      return then(root.attr(attr)!)
-    },
+    // Event
+    const eventName = $('.event a').trimText()
+    const eventHref = $('.event a').attr('href')
+    let eventId: number | undefined
+    if (eventHref) {
+      const match = eventHref.match(/\/events\/(\d+)/)
+      eventId = match ? Number(match[1]) : undefined
+    }
 
-    text(): string {
-      return root.text()
-    },
+    // ── 提取 blocks ──
+    const blocks: NewsContent['body']['blocks'] = []
 
-    html(): string {
-      return root.html()!
-    },
+    const contentContainer = $('.newsdsl .newstext-con').first()
 
-    textThen<T>(then: (value: string) => T): T {
-      return then(root.text())
-    },
+    if (contentContainer.exists()) {
+      contentContainer.children().each((i, child) => {
+        const $child = $(child)
 
-    first(): HLTVPageElement {
-      return attachMethods(root.first())
-    },
+        if ($child.hasClass('headertext')) {
+          const text = $child.trimText()
+          if (text) {
+            blocks.push({
+              type: 'header',
+              data: { text }
+            })
+          }
+        } else if ($child.hasClass('image-con')) {
+          const imgSrc = $child.find('img').attr('src')
+          if (imgSrc) {
+            blocks.push({
+              type: 'image',
+              data: { url: imgSrc }
+            })
+          }
+        } else if ($child.hasClass('news-block')) {
+          const text = $child.trimText()
+          if (text) {
+            blocks.push({
+              type: 'paragraph',
+              data: { text }
+            })
+          }
+        }
+        // 其他元素（如 read-more <a>）自動忽略
+      })
+    }
 
-    second(): HLTVPageElement {
-      return attachMethods(root.eq(1))
-    },
-
-    last(): HLTVPageElement {
-      return attachMethods(root.last())
-    },
-
-    data(name: string): any {
-      return root.data(name)
-    },
-
-    trimText(): string | undefined {
-      return root.text().trim() || undefined
-    },
-
-    numFromAttr(attr: string): number | undefined {
-      return parseNumber(root.attr(attr))
-    },
-
-    numFromText(): number | undefined {
-      return parseNumber(root.text())
-    },
-
-    lines(): string[] {
-      return root.text().split('\n')
-    },
-
-    exists(): boolean {
-      return root.length !== 0
-    },
-
-    toArray(): HLTVPageElement[] {
-      return root.toArray().map((el) => attachMethods(cheerio.load(el)(el)))
-    },
-
-    each(
-      func: (index: number, element: HLTVPageElement) => void
-    ): HLTVPageElement {
-      root.each((i, el) => func(i, attachMethods(cheerio.load(el).root())))
-      return this
-    },
-
-    prev(selector?: string): HLTVPageElement {
-      return attachMethods(root.prev(selector))
-    },
-
-    next(selector?: string): HLTVPageElement {
-      return attachMethods(root.next(selector))
-    },
-
-    eq(index: number): HLTVPageElement {
-      return attachMethods(root.eq(index))
-    },
-
-    children(selector?: string): HLTVPageElement {
-      return attachMethods(root.children(selector))
-    },
-
-    parent(): HLTVPageElement {
-      return attachMethods(root.parent())
-    },
-
-    contents(): HLTVPageElement {
-      return attachMethods(root.contents())
-    },
-
-    filter(
-      func: (index: number, element: HLTVPageElement) => boolean
-    ): HLTVPageElement {
-      return attachMethods(
-        root.filter((i, el) => func(i, attachMethods(cheerio.load(el).root())))
-      )
-    },
-
-    hasClass(className: string): boolean {
-      return root.hasClass(className)
-    },
-
-    index(): number {
-      return root.index()
+    return {
+      id,
+      date,
+      title,
+      author,
+      body: {
+        blocks
+      },
+      image_url,
+      event: eventName ? { name: eventName, id: eventId } : undefined
     }
   }
-}
-
-export const HLTVScraper = (root: cheerio.Root): HLTVPage => {
-  const selector = (selector: string): HLTVPageElement => {
-    return attachMethods(root(selector))
-  }
-  Object.assign(selector, root)
-
-  return selector as HLTVPage
-}
