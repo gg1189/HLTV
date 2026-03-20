@@ -58,9 +58,9 @@ export const getNewsContent =
 
     if (contentContainer.exists()) {
       contentContainer.children().each((i, el) => {
-        // el 就是 HLTVPageElement，可以直接用 .hasClass()、.trimText()、.find() 等
+        const className = el.attr('class') || ''
 
-        if (el.hasClass('headertext')) {
+        if (className.includes('headertext')) {
           const text = el.trimText()
           if (text) {
             blocks.push({
@@ -69,7 +69,7 @@ export const getNewsContent =
             })
           }
         }
-        else if (el.hasClass('image-con')) {
+        else if (className.includes('image-con')) {
           const imgSrc = el.find('img').attr('src')
           if (imgSrc) {
             blocks.push({
@@ -78,7 +78,7 @@ export const getNewsContent =
             })
           }
         }
-        else if (el.hasClass('news-block')) {
+        else if (className.includes('news-block')) {
           const text = el.trimText()
           if (text) {
             blocks.push({
