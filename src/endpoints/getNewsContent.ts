@@ -4,15 +4,16 @@ import { fetchPage, generateRandomSuffix } from '../utils'
 
 export interface NewsContent {
   id: string | number
-  date: string                    // ISO format, e.g. "2026-03-19T08:38:00.000Z"
+  date: string
   title: string
   author: string
   body: {
-    blocks: Array<
-      | { type: 'paragraph'; data: { text: string } }
-      | { type: 'header';    data: { text: string } }
-      | { type: 'image';     data: { url: string; alt?: string } }
-    >
+    blocks: Array<{
+      type: 'paragraph' | 'header'
+      data: {
+        text: string
+      }
+    }>
   }
   image_url?: string
   event?: {
@@ -28,26 +29,20 @@ export const getNewsContent =
     const html = await fetchPage(url, config.loadPage)
     const $ = HLTVScraper(html)
 
-    // Title
     const title = $('h1.headline').trimText() || 'No title'
-
-    // Author
     const author = $('.author-date-con .author a').trimText() || 'Unknown author'
 
-    // Date (data-unix is usually seconds)
     const dateUnix = $('.date').numFromAttr('data-unix')
     const date = dateUnix
       ? new Date(dateUnix * 1000).toISOString()
       : new Date().toISOString()
 
-    // Main featured image (optional - first image in .image-con)
     let image_url: string | undefined
     const srcset = $('.image-con picture source').attr('srcset')
     if (srcset) {
       image_url = srcset.split(',')[0]?.trim().split(' ')[0]
     }
 
-    // Event
     const eventName = $('.event a').trimText()
     const eventHref = $('.event a').attr('href')
     let eventId: number | undefined
@@ -56,47 +51,31 @@ export const getNewsContent =
       eventId = match ? Number(match[1]) : undefined
     }
 
-    // ── Build blocks in DOM order ──
+    // ── 提取 blocks ── 使用順序 push
     const blocks: NewsContent['body']['blocks'] = []
 
-    const contentContainer = $('.newsdsl .newstext-con').first()
+    const contentContainer = $('.newstext-con').first()
 
     if (contentContainer.exists()) {
-      // Iterate over all direct children to preserve exact order
-      contentContainer.children().each((i, child) => {
+      contentContainer.children().each((i, el) => {
+        const $el = $(el)
+        const text = $el.trimText()
 
-        const text = child.trimText()
-        const classAttr = $child.attr('class') || ''
+        if (!text) return
 
-        if (classAttr.includes('headertext') && text) {
+        if ($el.hasClass('headertext')) {
           blocks.push({
             type: 'header',
             data: { text }
           })
-        }
-        else if (classAttr.includes('news-block') && text) {
+        } else if ($el.hasClass('news-block')) {
           blocks.push({
             type: 'paragraph',
             data: { text }
           })
         }
-        else if (classAttr.includes('image-con')) {
-          // Extract best available image URL
-          let imgUrl =
-            child.find('img').attr('src') ||
-            child.find('source').attr('srcset')?.split(',')[0]?.trim().split(' ')[0]
-
-          if (imgUrl) {
-            blocks.push({
-              type: 'image',
-              data: {
-                url: imgUrl,
-                alt: child.find('img').attr('alt') || undefined
-              }
-            })
-          }
-        }
-        // <a class="news-read-more-1"> will be skipped automatically
+        // 可擴展其他類型，例如：
+        // else if ($el.hasClass('image-con')) { ... }
       })
     }
 
