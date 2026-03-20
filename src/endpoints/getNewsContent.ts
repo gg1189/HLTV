@@ -12,11 +12,11 @@ export interface NewsContent {
       type: 'paragraph' | 'header' | 'image'
       data: {
         text?: string
-        url?: string
+        url?: string              // 只在 type: 'image' 時存在
       }
     }>
   }
-  image_url?: string              // 保留原本的主圖（optional）
+  image_url?: string              // 保留原有欄位（可選，作為主要封面圖）
   event?: {
     name: string
     id?: number
@@ -36,13 +36,13 @@ export const getNewsContent =
     // Author
     const author = $('.author-date-con .author a').trimText() || 'Unknown author'
 
-    // Date (data-unix 通常是秒級 timestamp)
+    // Date
     const dateUnix = $('.date').numFromAttr('data-unix')
     const date = dateUnix
       ? new Date(dateUnix * 1000).toISOString()
-      : new Date().toISOString() // fallback to current time
+      : new Date().toISOString()
 
-    // 主圖（原本邏輯，保留作為後備）
+    // 主要封面圖（原有邏輯，保留作為獨立欄位）
     let image_url: string | undefined
     const srcset = $('.image-con picture source').attr('srcset')
     if (srcset) {
@@ -64,11 +64,11 @@ export const getNewsContent =
     const contentContainer = $('.newsdsl .newstext-con').first()
 
     if (contentContainer.exists()) {
-      // 遍歷所有直接子元素，按順序處理
+      // 按順序處理所有直接子元素
       contentContainer.children().each((i, child) => {
         const $child = $(child)
 
-        // .headertext → header
+        // headertext → header
         if ($child.hasClass('headertext')) {
           const text = $child.trimText()
           if (text) {
@@ -79,7 +79,7 @@ export const getNewsContent =
           }
         }
 
-        // .news-block → paragraph
+        // news-block → paragraph
         else if ($child.hasClass('news-block')) {
           const text = $child.trimText()
           if (text) {
@@ -90,7 +90,7 @@ export const getNewsContent =
           }
         }
 
-        // .image-con → image block，只取 <img> 的 src
+        // image-con → image block (只取 img src)
         else if ($child.hasClass('image-con')) {
           const imgSrc = $child.find('img').attr('src')
           if (imgSrc) {
