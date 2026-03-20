@@ -51,13 +51,15 @@ export const getNewsContent =
       eventId = match ? Number(match[1]) : undefined
     }
 
-    // ── 提取 blocks，按原始 DOM 順序 ──
+    // ── 提取 blocks ──
     const blocks: NewsContent['body']['blocks'] = []
 
     const contentContainer = $('.newsdsl .newstext-con').first()
 
     if (contentContainer.exists()) {
-      contentContainer.children().each((i, el) => {
+      const relevantChildren = contentContainer.children('p.headertext, p.news-block').toArray()
+
+      relevantChildren.forEach((el) => {
         const text = el.trimText()
         if (!text) return
 
@@ -74,7 +76,6 @@ export const getNewsContent =
             data: { text }
           })
         }
-        // 其他 class 忽略，不加入 blocks
       })
     }
 
