@@ -51,7 +51,7 @@ export const getNewsContent =
       eventId = match ? Number(match[1]) : undefined
     }
 
-    // ── 提取 blocks（按照 DOM 原始順序） ──
+    // ── 提取 blocks，按頁面順序 push ──
     const blocks: NewsContent['body']['blocks'] = []
 
     const contentContainer = $('.newsdsl .newstext-con').first()
@@ -62,17 +62,20 @@ export const getNewsContent =
         const text = $el.trimText()
         if (!text) return
 
-        if ($el.hasClass('headertext')) {
+        const className = $el.attr('class') || ''
+
+        if (className.includes('headertext')) {
           blocks.push({
             type: 'header',
             data: { text }
           })
-        } else if ($el.hasClass('news-block')) {
+        } else if (className.includes('news-block')) {
           blocks.push({
             type: 'paragraph',
             data: { text }
           })
         }
+        // 其他 class 直接忽略，不 push
       })
     }
 
