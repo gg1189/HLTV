@@ -42,7 +42,7 @@ export const getNewsContent =
       ? new Date(dateUnix * 1000).toISOString()
       : new Date().toISOString()
 
-    // Main image (kept as fallback / featured image)
+    // 主圖（保留原本邏輯）
     let image_url: string | undefined
     const srcset = $('.image-con picture source').attr('srcset')
     if (srcset) {
@@ -58,31 +58,36 @@ export const getNewsContent =
       eventId = match ? Number(match[1]) : undefined
     }
 
-    // ── Extract blocks in original DOM order ──
+    // ── 提取 blocks ──
     const blocks: NewsContent['body']['blocks'] = []
 
     const contentContainer = $('.newsdsl .newstext-con').first()
 
     if (contentContainer.exists()) {
+      // 按原始 DOM 順序遍歷所有直接子元素
       contentContainer.children().each((i, el) => {
-        if (el.hasClass('headertext')) {
-          const text = el
+        const test2 = $(el)  // 包裝成 HLTVPageElement 才能用 trimText() 等方法
+
+        if (test2.hasClass('headertext')) {
+          const text = test2.trimText()
           if (text) {
             blocks.push({
               type: 'header',
               data: { text }
             })
           }
-        } else if (el.hasClass('image-con')) {
-          const imgSrc = el.find('img').attr('src')
+        }
+        else if (test2.hasClass('image-con')) {
+          const imgSrc = test2.find('img').attr('src')
           if (imgSrc) {
             blocks.push({
               type: 'image',
               data: { url: imgSrc }
             })
           }
-        } else if (el.hasClass('news-block')) {
-          const text = el.trimText()
+        }
+        else if (test2.hasClass('news-block')) {
+          const text = test2.trimText()
           if (text) {
             blocks.push({
               type: 'paragraph',
@@ -90,7 +95,7 @@ export const getNewsContent =
             })
           }
         }
-        // other direct children (e.g. the "read more" <a>) are simply ignored
+        // 其他子元素（如 .news-read-more-1）直接忽略
       })
     }
 
