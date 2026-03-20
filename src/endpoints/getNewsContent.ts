@@ -9,7 +9,7 @@ export interface NewsContent {
   author: string
   body: {
     blocks: Array<{
-      type: 'paragraph' | 'header'  // 可未來擴展 quote / image / list 等
+      type: 'paragraph' | 'header'
       data: {
         text: string
       }
@@ -39,7 +39,7 @@ export const getNewsContent =
     const dateUnix = $('.date').numFromAttr('data-unix')
     const date = dateUnix
       ? new Date(dateUnix * 1000).toISOString()
-      : new Date().toISOString() // fallback
+      : new Date().toISOString() // fallback to current time
 
     // Image
     let image_url: string | undefined
@@ -63,7 +63,7 @@ export const getNewsContent =
     const contentContainer = $('.newsdsl .newstext-con').first()
 
     if (contentContainer.exists()) {
-      // 處理可能的 .headertext（開頭摘要/重點）
+      // .headertext → header block
       contentContainer.children('.headertext').each((i, el) => {
         const text = el.trimText()
         if (text) {
@@ -74,54 +74,19 @@ export const getNewsContent =
         }
       })
 
-      // 處理所有 .news-block（主要段落）
+      // .news-block → paragraph block
       contentContainer.children('.news-block').each((i, el) => {
         const text = el.trimText()
-        if (!text) return
-
-        // 簡單 heuristic 判斷是否為 header
-        const isLikelyHeader =
-          text.length < 60 &&
-          (text === text.toUpperCase() ||
-            text.includes('New') ||
-            text.includes('Update') ||
-            text.includes('Change') ||
-            text.includes(':') && !text.includes('.')) // 如 "New Reloading System:"
-
-        blocks.push({
-          type: isLikelyHeader ? 'header' : 'paragraph',
-          data: { text }
-        })
-      })
-
-      // fallback：如果完全沒抓到 .news-block，嘗試所有 p 標籤
-      if (blocks.length === 0) {
-        contentContainer.children('p').each((i, el) => {
-          const text = el.trimText()
-          if (text) {
-            blocks.push({
-              type: 'paragraph',
-              data: { text }
-            })
-          }
-        })
-      }
-    }
-
-    // 加入開頭介紹段落（模仿你提供的範例格式）
-    if (blocks.length > 0) {
-      const introDate = new Date(date).toLocaleDateString('en-US', {
-        month: 'long',
-        day: 'numeric',
-        year: 'numeric'
-      })
-      const introText = `${title} as of ${introDate}, which significantly alters the game's core mechanics.`
-
-      blocks.unshift({
-        type: 'paragraph',
-        data: { text: introText }
+        if (text) {
+          blocks.push({
+            type: 'paragraph',
+            data: { text }
+          })
+        }
       })
     }
+
+    // 如果沒有任何 block，blocks 會保持為空陣列
 
     return {
       id,
