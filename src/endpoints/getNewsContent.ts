@@ -7,10 +7,10 @@ export interface NewsContent {
   date: string                    // ISO format, e.g. "2026-03-19T08:38:00.000Z"
   title: string
   author: string
-  content: string                 // optional: plain text fallback
-  body?: {
+  content?: string                // optional: raw joined text
+  body: {
     blocks: Array<{
-      type: 'paragraph' | 'header'
+      type: 'paragraph' | 'header'  // 可擴展 quote / image / list 等
       data: {
         text: string
       }
@@ -36,58 +36,11 @@ export const getNewsContent =
     // Author
     const author = $('.author-date-con .author a').trimText() || 'Unknown author'
 
-    // Date (data-unix usually in seconds)
+    // Date (data-unix 通常是秒級 timestamp)
     const dateUnix = $('.date').numFromAttr('data-unix')
     const date = dateUnix
       ? new Date(dateUnix * 1000).toISOString()
-      : new Date().toISOString()
-
-    // ────────────────────────────────────────────────
-    // 核心改進：直接從 DOM 結構產生 blocks
-    // ────────────────────────────────────────────────
-    const blocks: NewsContent['body']['blocks'] = []
-
-    const contentContainer = $('.newsdsl .newstext-con').first()
-
-    if (contentContainer.exists()) {
-      // 處理所有直接子元素，根據 class 決定類型
-      contentContainer.children().each((i, el) => {
-        const $el = $(el)
-
-        const text = $el.trimText()
-        if (!text) return  // 跳過空內容
-
-        let type: 'paragraph' | 'header' = 'paragraph'
-
-        // 根據 class 或特徵判斷
-        if ($el.hasClass('headertext') || $el.hasClass('newstext-header')) {
-          type = 'header'
-        } else if ($el.hasClass('news-block')) {
-          type = 'paragraph'
-        } else if (
-          // 額外 heuristic：短內容 + 看起來像標題
-          text.length < 80 &&
-          (text === text.toUpperCase() ||
-            text.includes('Update') ||
-            text.includes('New') ||
-            text.includes('Change') ||
-            text.endsWith(':'))
-        ) {
-          type = 'header'
-        }
-
-        blocks.push({
-          type,
-          data: { text }
-        })
-      })
-    }
-
-    // 產生純文字版本（可選，方便 debug 或相容舊系統）
-    const plainContent = blocks
-      .map(b => b.data.text)
-      .join('\n\n')
-      .trim()
+      : new Date().toISOString() // fallback
 
     // Image
     let image_url: string | undefined
@@ -105,13 +58,82 @@ export const getNewsContent =
       eventId = match ? Number(match[1]) : undefined
     }
 
+    // ── 核心：提取 blocks ──
+    const blocks: NewsContent['body']['blocks'] = []
+
+    const contentContainer = $('.newsdsl .newstext-con').first()
+
+    if (contentContainer.exists()) {
+      // 處理可能的 .headertext（開頭摘要/重點）
+      contentContainer.children('.headertext').each((i, el) => {
+        const text = el.trimText()
+        if (text) {
+          blocks.push({
+            type: 'header',
+            data: { text }
+          })
+        }
+      })
+
+      // 處理所有 .news-block（主要段落）
+      contentContainer.children('.news-block').each((i, el) => {
+        const text = el.trimText()
+        if (!text) return
+
+        // 簡單 heuristic 判斷是否為 header
+        const isLikelyHeader =
+          text.length < 60 &&
+          (text === text.toUpperCase() ||
+            text.includes('New') ||
+            text.includes('Update') ||
+            text.includes('Change') ||
+            text.includes(':') && !text.includes('.')) // 如 "New Reloading System:"
+
+        blocks.push({
+          type: isLikelyHeader ? 'header' : 'paragraph',
+          data: { text }
+        })
+      })
+
+      // 如果完全沒抓到 .news-block，可 fallback 取所有 p 標籤
+      if (blocks.length === 0) {
+        contentContainer.children('p').each((i, el) => {
+          const text = el.trimText()
+          if (text) {
+            blocks.push({
+              type: 'paragraph',
+              data: { text }
+            })
+          }
+        })
+      }
+    }
+
+    // 加入開頭介紹段落（可選，模仿你提供的範例）
+    if (blocks.length > 0 && blocks[0].type !== 'header') {
+      const introText = `${title} as of ${new Date(date).toLocaleDateString('en-US', {
+        month: 'long',
+        day: 'numeric',
+        year: 'numeric'
+      })}, which significantly alters the game's core mechanics.`
+      blocks.unshift({
+        type: 'paragraph',
+        data: { text: introText }
+      })
+    }
+
+    // 純文字版本（可選保留）
+    const rawContent = blocks.map(b => b.data.text).join('\n\n').trim()
+
     return {
       id,
       date,
       title,
       author,
-      content: plainContent || 'No content available',
-      body: blocks.length > 0 ? { blocks } : undefined,
+      content: rawContent || undefined,  // 可移除此欄位
+      body: {
+        blocks
+      },
       image_url,
       event: eventName ? { name: eventName, id: eventId } : undefined
     }
