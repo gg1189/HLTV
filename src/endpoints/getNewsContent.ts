@@ -4,24 +4,14 @@ import { fetchPage, generateRandomSuffix } from '../utils'
 
 export interface NewsContent {
   id: string | number
-  date: string                    // ISO format, e.g. "2026-03-19T08:38:00.000Z"
+  date: string                    // ISO format, e.g. "2025-03-19T08:38:00.000Z"
   title: string
   author: string
   body: {
     blocks: Array<
-      | {
-          type: 'paragraph' | 'header'
-          data: {
-            text: string
-          }
-        }
-      | {
-          type: 'image'
-          data: {
-            url: string
-            alt?: string
-          }
-        }
+      | { type: 'paragraph'; data: { text: string } }
+      | { type: 'header';    data: { text: string } }
+      | { type: 'image';     data: { url: string; alt?: string } }
     >
   }
   image_url?: string
@@ -44,18 +34,17 @@ export const getNewsContent =
     // Author
     const author = $('.author-date-con .author a').trimText() || 'Unknown author'
 
-    // Date
-    const dateUnixRaw = $('.date').attr('data-unix')
-    const dateUnix = dateUnixRaw ? parseInt(dateUnixRaw, 10) : NaN
-    const date = !isNaN(dateUnix) && dateUnix > 0
+    // Date (data-unix is usually seconds)
+    const dateUnix = $('.date').numFromAttr('data-unix')
+    const date = dateUnix
       ? new Date(dateUnix * 1000).toISOString()
       : new Date().toISOString()
 
-    // 主圖（封面圖）
+    // Main featured image (optional - first image in .image-con)
     let image_url: string | undefined
-    const srcsetMain = $('.image-con picture source').attr('srcset')
-    if (srcsetMain) {
-      image_url = srcsetMain.split(',')[0]?.trim().split(' ')[0]
+    const srcset = $('.image-con picture source').attr('srcset')
+    if (srcset) {
+      image_url = srcset.split(',')[0]?.trim().split(' ')[0]
     }
 
     // Event
@@ -67,57 +56,47 @@ export const getNewsContent =
       eventId = match ? Number(match[1]) : undefined
     }
 
-    // ── Debug logs ──
-    console.log(`[getNewsContent] News ID: ${id}`)
-    console.log(`[getNewsContent] URL: ${url}`)
-    console.log(`[getNewsContent] Container exists: ${$('.newstext-con').exists()}`)
-    console.log(`[getNewsContent] Found .newsdsl .newstext-con: ${$('.newsdsl .newstext-con').exists()}`)
-    console.log(`[getNewsContent] Number of direct children in .newstext-con: ${$('.newstext-con').children().length}`)
-
-    // 列出所有直接子元素的 class（最重要的 debug 資訊）
-    const childClasses = $('.newstext-con').children().map((i, el) => {
-      const className = $(el).attr('class') || '(no class)'
-      const tag = el.tagName.toLowerCase()
-      return `${tag}.${className}`
-    }).toArray()
-    console.log('[getNewsContent] Direct children classes:', childClasses)
-
-    // 提取 blocks（按原始順序）
+    // ── Build blocks in DOM order ──
     const blocks: NewsContent['body']['blocks'] = []
 
-    const contentContainer = $('.newstext-con').first()  // 改用更寬鬆的選擇器
+    const contentContainer = $('.newsdsl .newstext-con').first()
 
     if (contentContainer.exists()) {
-      contentContainer.children().each((i, el) => {
-        const el = $(el)
-        const className = el.attr('class') || ''
-        const text = el.trimText()
+      // Iterate over **all direct children** to preserve exact order
+      contentContainer.children().each((i, child) => {
+        const text = child.trimText()
 
-        if (className.includes('headertext')) {
-          if (text) {
-            blocks.push({ type: 'header', data: { text } })
-          }
-        } else if (className.includes('news-block')) {
-          if (text) {
-            blocks.push({ type: 'paragraph', data: { text } })
-          }
-        } else if (className.includes('image-con')) {
-          let imgUrl = el.find('picture source').attr('srcset')?.split(',')[0]?.trim().split(' ')[0]
-          if (!imgUrl) {
-            imgUrl = el.find('img').attr('src')
-          }
-          const alt = el.find('img').attr('alt') || el.find('img').attr('title') || undefined
+        if (child.hasClass('headertext') && text) {
+          blocks.push({
+            type: 'header',
+            data: { text }
+          })
+        }
+        else if (child.hasClass('news-block') && text) {
+          blocks.push({
+            type: 'paragraph',
+            data: { text }
+          })
+        }
+        else if (child.hasClass('image-con')) {
+          // Extract best available image URL
+          let imgUrl =
+            child.find('img').attr('src') ||
+            child.find('source').attr('srcset')?.split(',')[0]?.trim().split(' ')[0]
+
           if (imgUrl) {
             blocks.push({
               type: 'image',
-              data: { url: imgUrl, alt }
+              data: {
+                url: imgUrl,
+                alt: child.find('img').attr('alt') || undefined
+              }
             })
           }
         }
+        // You can ignore <a class="news-read-more-1"> or handle it separately if needed
       })
     }
-
-    console.log(`[getNewsContent] Generated blocks count: ${blocks.length}`)
 
     return {
       id,
