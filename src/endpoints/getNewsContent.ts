@@ -36,14 +36,13 @@ export const getNewsContent =
     // Author
     const author = $('.author-date-con .author a').trimText() || 'Unknown author'
 
-    // Date - 加安全檢查避免異常值
-    let dateUnix = $('.date').numFromAttr('data-unix')
-    if (!dateUnix || dateUnix <= 0) {
-      dateUnix = Math.floor(Date.now() / 1000)  // fallback to current unix timestamp in seconds
-    }
-    const date = new Date(dateUnix * 1000).toISOString()
+    // Date
+    const dateUnix = $('.date').numFromAttr('data-unix')
+    const date = dateUnix
+      ? new Date(dateUnix * 1000).toISOString()
+      : new Date().toISOString()
 
-    // 主圖（從 .image-con 抓，如果有）
+    // 主圖（保留原本邏輯）
     let image_url: string | undefined
     const srcset = $('.image-con picture source').attr('srcset')
     if (srcset) {
@@ -62,31 +61,23 @@ export const getNewsContent =
     // ── 提取 blocks ──
     const blocks: NewsContent['body']['blocks'] = []
 
-    // 嘗試多個可能的內容容器
-    const possibleContainers = [
-      $('.newsdsl .newstext-con').first(),
-      $('.news-content').first(),
-      $('.article-body').first(),
-      $('.newsArticle').first(),
-      $('.news-body').first(),
-      $('.article-text').first()
-    ]
+    const contentContainer = $('.newsdsl .newstext-con').first()
 
-    let contentContainer = possibleContainers.find(c => c.exists()) || null
-
-    if (contentContainer) {
-      // 有找到容器，按原始順序處理其直接子元素
+    if (contentContainer.exists()) {
+      // 按原始 DOM 順序遍歷所有直接子元素
       contentContainer.children().each((i, el) => {
-        if (el.hasClass('headertext')) {
-          const text = el.trimText()
-          if (text) {
+        // el 已經是 HLTVPageElement，直接使用
+
+
+
             blocks.push({
-              type: 'header',
-              data: { text }
+              type: 'test',
+              data: { 'test' }
             })
-          }
-        }
+
+
         else if (el.hasClass('image-con')) {
+          // 取第一個 img 的 src
           const imgSrc = el.find('img').first().attr('src')
           if (imgSrc) {
             blocks.push({
@@ -104,24 +95,8 @@ export const getNewsContent =
             })
           }
         }
-        // 忽略其他子元素
+        // 其他子元素（如 read-more 區塊）會被忽略
       })
-    }
-
-    // 如果還是沒抓到任何 block，嘗試全頁 .news-block 作為 fallback
-    if (blocks.length === 0) {
-      const fallbackBlocks = $('.news-block')
-      if (fallbackBlocks.length > 0) {
-        fallbackBlocks.each((i, el) => {
-          const text = el.trimText()
-          if (text) {
-            blocks.push({
-              type: 'paragraph',
-              data: { text }
-            })
-          }
-        })
-      }
     }
 
     return {
