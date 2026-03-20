@@ -58,24 +58,24 @@ export const getNewsContent =
 
     if (contentContainer.exists()) {
       contentContainer.children().each((i, el) => {
-        const $el = $(el)
-        const text = $el.trimText()
+        const test = $(el)
+        const text = test.trimText()
 
         if (!text) return
 
-        if ($el.hasClass('headertext')) {
+        if (test.hasClass('headertext')) {
           blocks.push({
             type: 'header',
             data: { text }
           })
-        } else if ($el.hasClass('news-block')) {
+        } else if (test.hasClass('news-block')) {
           blocks.push({
             type: 'paragraph',
             data: { text }
           })
         }
         // 可擴展其他類型，例如：
-        // else if ($el.hasClass('image-con')) { ... }
+        // else if (test.hasClass('image-con')) { ... }
       })
     }
 
