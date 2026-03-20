@@ -67,8 +67,7 @@ export const getNewsContent =
       contentContainer.children().each((i, child) => {
 
         if (child.hasClass('headertext')) {
-          const text = child.trimText()
-          if (text) {
+
             blocks.push({
               type: 'header',
               data: { text }
