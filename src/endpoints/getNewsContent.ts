@@ -54,28 +54,28 @@ export const getNewsContent =
     // ── 提取 blocks ── 使用順序 push
     const blocks: NewsContent['body']['blocks'] = []
 
-    const contentContainer = $('.newstext-con').first()
+    const contentContainer = $('.newsdsl .newstext-con').first()
 
     if (contentContainer.exists()) {
       contentContainer.children().each((i, el) => {
-        const test = $(el)
-        const text = test.trimText()
+        const el = $(el)
+        const text = el.trimText()
 
         if (!text) return
 
-        if (test.hasClass('headertext')) {
+        if (el.hasClass('headertext')) {
           blocks.push({
             type: 'header',
             data: { text }
           })
-        } else if (test.hasClass('news-block')) {
+        } else if (el.hasClass('news-block')) {
           blocks.push({
             type: 'paragraph',
             data: { text }
           })
         }
         // 可擴展其他類型，例如：
-        // else if (test.hasClass('image-con')) { ... }
+        // else if (el.hasClass('image-con')) { ... }
       })
     }
 
